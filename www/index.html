@@ -2,7 +2,7 @@
 <html lang="en">  
 <head> 
     <meta charset="UTF-8"> 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"> 
     <title>OSRS Herblore Tracker</title> 
     <style> 
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Roboto+Mono:wght@500&display=swap');
@@ -132,6 +132,51 @@
             0% { background-color: #4a3b2c; } 
             100% { background-color: #8b0000; } 
         } 
+
+        /* ===== Fit-to-screen layout: everything scales with its card, no scrolling ===== */
+        html { height: 100%; overflow: hidden; }
+        body {
+            height: 100vh;
+            height: 100dvh;
+            padding-top: max(8px, env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
+            padding-right: max(8px, env(safe-area-inset-right, 0px));
+            padding-bottom: max(8px, env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+            padding-left: max(8px, env(safe-area-inset-left, 0px));
+            overflow: hidden;
+            overscroll-behavior: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        .grid-container {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-rows: repeat(4, minmax(0, 1fr));
+            gap: 6px;
+            height: 100%;
+            min-height: 0;
+        }
+        .patch-card, .global-card {
+            container-type: size;   /* lets children size themselves from the card's own width/height */
+            min-width: 0;
+            min-height: 0;
+            padding: 3%;
+            overflow: hidden;
+        }
+        .patch-name { font-size: min(12cqw, 14cqh); }
+        .timer-display-wrapper { gap: 1cqh; min-height: 0; max-width: 100%; }
+        .timer-row { gap: 2.5cqw; max-width: 100%; justify-content: center; }
+        .farming-icon { width: min(17cqw, 24cqh); height: min(17cqw, 24cqh); flex-shrink: 0; }
+        .timer { font-size: min(10.5cqw, 13cqh); min-width: 0; white-space: nowrap; }
+        .cycle-text { font-size: min(8.5cqw, 10cqh); }
+        .btn { font-size: min(9.5cqw, 12cqh); padding: min(4cqw, 5cqh) 0; letter-spacing: 0; }
+        .btn-large {
+            height: min(60cqh, 38cqw);
+            font-size: min(8cqw, 22cqh);
+            letter-spacing: 0;
+            padding: 0 2px;
+            overflow: hidden;
+        }
+        .btn-inner { gap: 2cqw; }
+        .uim-icon, .spade-icon, .secateurs-icon { width: min(13cqw, 30cqh); height: min(13cqw, 30cqh); flex-shrink: 0; }
     </style> 
 </head> 
 <body> 
@@ -278,7 +323,7 @@
                 <div class="timer-display-wrapper" style="margin: 2px 0;"> 
                     <div class="timer-row"> 
                         <img class="farming-icon" src="https://oldschool.runescape.wiki/images/Farming_icon.png" alt="Farming"> 
-                        <div class="timer" id="global-tick-timer" style="font-size: 14px; min-width: 75px; color: #55FF55;">--:--</div> 
+                        <div class="timer" id="global-tick-timer" style="color: #55FF55;">--:--</div> 
                         <img class="farming-icon" src="https://oldschool.runescape.wiki/images/Farming_icon.png" alt="Farming"> 
                     </div> 
                 </div> 
