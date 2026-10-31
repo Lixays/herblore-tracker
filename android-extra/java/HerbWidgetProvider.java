@@ -15,15 +15,9 @@ import android.widget.RemoteViews;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
-
 /** Home-screen widget: shows the soonest-finishing timer and a Replant all button. */
 public class HerbWidgetProvider extends AppWidgetProvider {
 
-    public static final String PREFS = "herb_widget";
-    public static final String ACTION_REPLANT = "com.example.herbloretracker.REPLANT";
     public static final String ACTION_REFRESH = "com.example.herbloretracker.WIDGET_REFRESH";
 
     @Override
@@ -60,8 +54,7 @@ public class HerbWidgetProvider extends AppWidgetProvider {
         int running = 0;
         int ready = 0;
         try {
-            String json = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("timers", "[]");
-            JSONArray timers = new JSONArray(json);
+            JSONArray timers = HerbStore.timers(context);
             for (int i = 0; i < timers.length(); i++) {
                 JSONObject t = timers.getJSONObject(i);
                 long finish = t.optLong("finish", 0);
@@ -81,14 +74,13 @@ public class HerbWidgetProvider extends AppWidgetProvider {
         RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.herb_widget);
 
         if (running > 0) {
-            String clock = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date(nextFinish));
             views.setTextViewText(R.id.widget_name, "Next: " + nextName);
             views.setViewVisibility(R.id.widget_timer, View.VISIBLE);
             if (Build.VERSION.SDK_INT >= 24) {
                 views.setChronometerCountDown(R.id.widget_timer, true);
             }
             views.setChronometer(R.id.widget_timer, SystemClock.elapsedRealtime() + (nextFinish - now), null, true);
-            String sub = "Ready at " + clock + " \u00B7 " + running + " growing";
+            String sub = "Ready at " + HerbNotifier.clock(nextFinish) + " \u00B7 " + running + " growing";
             if (ready > 0) sub += " \u00B7 " + ready + " ready";
             views.setTextViewText(R.id.widget_sub, sub);
         } else if (ready > 0) {
@@ -110,11 +102,11 @@ public class HerbWidgetProvider extends AppWidgetProvider {
         scheduleRefresh(context, running > 0 ? nextFinish : 0);
     }
 
+    /** Replant happens in the background, the app is not opened. */
     private static PendingIntent replantIntent(Context context) {
-        Intent intent = new Intent(context, MainActivity.class);
-        intent.setAction(ACTION_REPLANT);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        return PendingIntent.getActivity(context, 1, intent,
+        Intent intent = new Intent(context, ReplantReceiver.class);
+        intent.setAction(ReplantReceiver.ACTION);
+        return PendingIntent.getBroadcast(context, 1, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 
@@ -138,15 +130,6 @@ public class HerbWidgetProvider extends AppWidgetProvider {
         PendingIntent pending = refreshIntent(context);
         alarms.cancel(pending);
         if (at <= 0) return;
-        long when = at + 1000;
-        try {
-            if (Build.VERSION.SDK_INT >= 31 && !alarms.canScheduleExactAlarms()) {
-                alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, when, pending);
-            } else {
-                alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, when, pending);
-            }
-        } catch (SecurityException e) {
-            alarms.set(AlarmManager.RTC_WAKEUP, when, pending);
-        }
+        HerbNotifier.setAlarm(alarms, at + 1000, pending);
     }
 }

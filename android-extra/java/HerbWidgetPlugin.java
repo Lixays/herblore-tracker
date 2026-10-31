@@ -1,7 +1,6 @@
 package com.example.herbloretracker;
 
 import android.content.Context;
-import android.content.Intent;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -10,45 +9,36 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 /**
- * Bridge between the web app and the home-screen widget.
- *  - update({ timers })  : saves the timers for the widget and redraws it
- *  - moveToBack()        : sends the app back to the home screen
- *  - event "replantRequested" : fired when the widget's Replant button is tapped
+ * Bridge between the web app and the Android side (notifications + widget).
+ *  - update({ timers, windows }) : saves the timers, reschedules notifications, redraws the widget
+ *  - getState()                  : timers + whether they were changed by a notification/widget button
+ *  - clearDirty()                : marks those changes as picked up
  */
 @CapacitorPlugin(name = "HerbWidget")
 public class HerbWidgetPlugin extends Plugin {
 
-    @Override
-    public void load() {
-        if (getActivity() != null) handleIntent(getActivity().getIntent());
-    }
-
-    @Override
-    protected void handleOnNewIntent(Intent intent) {
-        super.handleOnNewIntent(intent);
-        handleIntent(intent);
-    }
-
-    private void handleIntent(Intent intent) {
-        if (intent != null && HerbWidgetProvider.ACTION_REPLANT.equals(intent.getAction())) {
-            intent.setAction(Intent.ACTION_MAIN);   // so it is only handled once
-            notifyListeners("replantRequested", new JSObject(), true);
-        }
-    }
-
     @PluginMethod
     public void update(PluginCall call) {
-        String timers = call.getString("timers", "[]");
         Context context = getContext();
-        context.getSharedPreferences(HerbWidgetProvider.PREFS, Context.MODE_PRIVATE)
-                .edit().putString("timers", timers).apply();
+        HerbStore.saveTimersJson(context, call.getString("timers", "[]"));
+        HerbStore.saveWindowsJson(context, call.getString("windows", "[9,29,49]"));
+        HerbNotifier.scheduleAll(context);
         HerbWidgetProvider.updateAll(context);
         call.resolve();
     }
 
     @PluginMethod
-    public void moveToBack(PluginCall call) {
-        if (getActivity() != null) getActivity().moveTaskToBack(true);
+    public void getState(PluginCall call) {
+        Context context = getContext();
+        JSObject result = new JSObject();
+        result.put("dirty", HerbStore.isDirty(context));
+        result.put("timers", HerbStore.timersJson(context));
+        call.resolve(result);
+    }
+
+    @PluginMethod
+    public void clearDirty(PluginCall call) {
+        HerbStore.setDirty(getContext(), false);
         call.resolve();
     }
 }

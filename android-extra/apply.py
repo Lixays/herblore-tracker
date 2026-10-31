@@ -25,6 +25,11 @@ required = [
     "android-extra/java/MainActivity.java",
     "android-extra/java/HerbWidgetPlugin.java",
     "android-extra/java/HerbWidgetProvider.java",
+    "android-extra/java/HerbStore.java",
+    "android-extra/java/HerbNotifier.java",
+    "android-extra/java/ReadyReceiver.java",
+    "android-extra/java/ReplantReceiver.java",
+    "android-extra/java/BootReceiver.java",
     "android-extra/res/layout/herb_widget.xml",
     "android-extra/res/xml/herb_widget_info.xml",
     "android-extra/res/drawable/widget_bg.xml",
@@ -52,29 +57,38 @@ for src in glob.glob("android-extra/java/*.java"):
     with open(os.path.join(java_dir, os.path.basename(src)), "w", encoding="utf-8") as out:
         out.write(text)
 
-# 4. manifest: permissions + widget receiver
+# 4. manifest: permissions + receivers (widget, notifications, boot)
 manifest = open(manifest_path, encoding="utf-8").read()
 permissions = (
     '<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n'
     '    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>\n'
+    '    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>\n'
     '    '
 )
-receiver = (
+receivers = (
     '    <receiver android:name=".HerbWidgetProvider" android:exported="true">\n'
     '            <intent-filter>\n'
     '                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>\n'
     '            </intent-filter>\n'
     '            <meta-data android:name="android.appwidget.provider" android:resource="@xml/herb_widget_info"/>\n'
     '        </receiver>\n'
+    '        <receiver android:name=".ReadyReceiver" android:exported="false"/>\n'
+    '        <receiver android:name=".ReplantReceiver" android:exported="false"/>\n'
+    '        <receiver android:name=".BootReceiver" android:exported="true">\n'
+    '            <intent-filter>\n'
+    '                <action android:name="android.intent.action.BOOT_COMPLETED"/>\n'
+    '                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>\n'
+    '            </intent-filter>\n'
+    '        </receiver>\n'
     '    '
 )
 if "POST_NOTIFICATIONS" not in manifest:
     manifest = manifest.replace("<application", permissions + "<application", 1)
 if "HerbWidgetProvider" not in manifest:
-    manifest = manifest.replace("</application>", receiver + "</application>", 1)
-for needed in ("POST_NOTIFICATIONS", "HerbWidgetProvider"):
+    manifest = manifest.replace("</application>", receivers + "</application>", 1)
+for needed in ("POST_NOTIFICATIONS", "RECEIVE_BOOT_COMPLETED", "HerbWidgetProvider", "ReadyReceiver", "ReplantReceiver", "BootReceiver"):
     if needed not in manifest:
         fail("could not patch AndroidManifest.xml (" + needed + ")")
 open(manifest_path, "w", encoding="utf-8").write(manifest)
 
-print("Icons, widget and permissions applied for", pkg)
+print("Icons, widget, notifications and permissions applied for", pkg)

@@ -290,6 +290,9 @@
 
         /* ---------- Settings gear + farming tick pop-up ---------- */
         .gear-btn { cursor: pointer; padding: 0; font: inherit; color: inherit; }
+        /* Turns the watering can the same gold as the cog */
+        .gold-icon { filter: brightness(0) saturate(100%) invert(47%) sepia(57%) saturate(1158%) hue-rotate(18deg) brightness(81%) contrast(94%); }
+        .about-text { font-size: 14px; line-height: 1.55; margin-bottom: 4px; }
         .gear-btn svg { width: calc(var(--u) * 17); height: calc(var(--u) * 17); fill: var(--osrs-gold-text); }
 
         .modal-overlay {
@@ -378,9 +381,9 @@
 
         <!-- HEADER -->
         <div class="app-header">
-            <div class="header-badge">
-                <img src="https://oldschool.runescape.wiki/images/Watering_can%288%29.png" alt="Watering Can">
-            </div>
+            <button class="header-badge gear-btn" onclick="openAbout()" aria-label="About">
+                <img class="gold-icon" src="https://oldschool.runescape.wiki/images/Watering_can%288%29.png" alt="Watering Can">
+            </button>
             <h1 class="osrs-font-title">Herb Patch Timers</h1>
             <button class="header-badge gear-btn" onclick="openTickSettings(false)" aria-label="Farming tick settings">
                 <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
@@ -442,6 +445,16 @@
         </div>
     </div>
 
+    <!-- ABOUT -->
+    <div class="modal-overlay" id="about-modal" hidden onclick="if (event.target === this) closeAbout()">
+        <div class="modal-card osrs-panel">
+            <p class="modal-text about-text">Heyo! I use a similar timer on PC on a side display for tracking different herb patches. Using AI I've transfered that into an app with some other features for a QOL mobile timer. If you've set your farming tick up wrong you can fix that in the settings. Make sure you give notification/timer permissions for this to work. You can reset all timers from the notification so you don't have to tab out of Scape. Do what you want with this app. Just don't sell it. Selling AI stuff is fucking stupid. Cheers, Rikku.</p>
+            <div class="modal-actions">
+                <button class="osrs-btn modal-btn modal-save" onclick="closeAbout()">Close</button>
+            </div>
+        </div>
+    </div>
+
     <!-- SCRIPT -->
     <script>
         // Minutes past the hour when herb patches tick (20 minutes apart). Editable via the gear button.
@@ -485,49 +498,19 @@
             { id: 'farming_guild', name: 'Guild', icon: 'https://oldschool.runescape.wiki/images/thumb/Seed_pack_detail.png/150px-Seed_pack_detail.png?2567b' },
         ];
 
-        // ---------- Android notifications (Capacitor) ----------
-        // LN is undefined when opened in a normal browser, so the page still works there.
+        // ---------- Notifications & widget (handled by the Android side) ----------
+        // The app hands its timers to the Android side. That is what shows the "ready" notifications,
+        // the status-bar icon and the home-screen widget, and what lets their buttons replant
+        // without opening the app. These are undefined in a normal browser, so the page still works there.
         const LN = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications;
+        const HW = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.HerbWidget;
 
-        const NOTIF_ICON = 'ic_stat_herb';   // status-bar icon (android-res/drawable-*/ic_stat_herb.png)
-        const RUNNING_ID = 1000;             // the "timers running" notification
-        let notificationsReady = false;
-        let lastRunningKey = null;
-
+        // Only asks for permission; the notifications themselves come from the Android side.
         async function setupNotifications() {
             if (!LN) return;
             try {
-                // Listen for the "Restart all" button on the finished notification
-                LN.addListener('localNotificationActionPerformed', async (event) => {
-                    if (event.actionId === 'restart') await restartFinishedTimers();
-                });
-
                 let perm = await LN.checkPermissions();
                 if (perm.display !== 'granted') perm = await LN.requestPermissions();
-
-                await LN.createChannel({
-                    id: 'herb-timers',
-                    name: 'Herb timers',
-                    description: 'Alerts when herb patches are ready',
-                    importance: 5,
-                    visibility: 1,
-                    vibration: true
-                });
-
-                // Quiet channel for the always-on "timers running" icon
-                await LN.createChannel({
-                    id: 'herb-running',
-                    name: 'Timers running',
-                    description: 'Shows an icon while herb timers are growing',
-                    importance: 2,
-                    visibility: 1,
-                    vibration: false
-                });
-
-                // The button on the "ready to harvest" notification
-                await LN.registerActionTypes({
-                    types: [{ id: 'HERB_DONE', actions: [{ id: 'restart', title: 'Restart all' }] }]
-                });
 
                 // Ask once for "exact alarm" permission so alerts fire on time (Android 12+)
                 if (!localStorage.getItem('asked_exact_alarm')) {
@@ -538,117 +521,43 @@
                     }
                 }
             } catch (e) { console.error('Notification setup failed', e); }
-            notificationsReady = true;
         }
 
-        // Shows an icon in the status bar while at least one timer is growing.
-        // Removed again when nothing is growing.
-        async function updateRunningNotification(force) {
-            if (!LN || !notificationsReady) return;
-            try {
-                const now = Date.now();
-                const running = patches
-                    .map(p => parseInt(localStorage.getItem(`finish_${p.id}`)))
-                    .filter(t => t && t > now);
-                const next = running.length ? Math.min(...running) : 0;
-                const key = running.length ? `${running.length}:${next}` : 'none';
-                if (!force && key === lastRunningKey) return;
-                lastRunningKey = key;
-
-                if (!running.length) {
-                    await LN.cancel({ notifications: [{ id: RUNNING_ID }] });
-                    return;
-                }
-                await LN.schedule({ notifications: [{
-                    id: RUNNING_ID,
-                    title: 'Herb timers running',
-                    body: `${running.length} growing · next ready ${formatClock(next)}`,
-                    channelId: 'herb-running',
-                    smallIcon: NOTIF_ICON,
-                    ongoing: true,
-                    autoCancel: false
-                }] });
-            } catch (e) { console.error('Running notification failed', e); }
-        }
-
-        // Re-schedules every "ready" notification from the saved timers.
-        // Patches finishing at the same moment share one notification.
-        async function syncNotifications() {
-            pushWidgetData();
-            if (!LN) return;
-            try {
-                const pending = await LN.getPending();
-                if (pending.notifications.length) {
-                    await LN.cancel({ notifications: pending.notifications.map(n => ({ id: n.id })) });
-                }
-
-                const now = Date.now();
-                const groups = {};
-                patches.forEach(p => {
-                    const t = parseInt(localStorage.getItem(`finish_${p.id}`));
-                    if (t && t > now) (groups[t] = groups[t] || []).push(p.name);
-                });
-
-                const notifications = Object.keys(groups).map((t, i) => {
-                    const finishAt = parseInt(t);
-                    const names = groups[t].length === patches.length ? 'All patches' : groups[t].join(', ');
-                    // If restarted when this fires, they'll next be done at:
-                    const restartDone = formatClock(getFirstTick(new Date(finishAt)).getTime() + GROW_MS);
-                    return {
-                        id: i + 1,
-                        title: 'Herbs ready to harvest!',
-                        body: `${names} · restart to be done at ${restartDone}`,
-                        largeBody: `${names} ready to harvest.\nRestart now and they'll next be done at ${restartDone}.`,
-                        channelId: 'herb-timers',
-                        smallIcon: NOTIF_ICON,
-                            actionTypeId: 'HERB_DONE',
-                        schedule: { at: new Date(finishAt), allowWhileIdle: true }
-                    };
-                });
-
-                if (notifications.length) await LN.schedule({ notifications });
-            } catch (e) { console.error('Scheduling failed', e); }
-            await updateRunningNotification(true);
-        }
-        // -------------------------------------------------------
-
-        // ---------- Home-screen widget ----------
-        const HW = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.HerbWidget;
-
-        // Gives the widget the current timers so it can show the soonest one.
+        // Sends the current timers + farming tick to the Android side.
         function pushWidgetData() {
             if (!HW) return;
             try {
                 const timers = patches.map(p => ({
+                    id: p.id,
                     name: p.name,
                     finish: parseInt(localStorage.getItem(`finish_${p.id}`)) || 0
                 }));
-                Promise.resolve(HW.update({ timers: JSON.stringify(timers) })).catch(() => {});
-            } catch (e) { console.error('Widget update failed', e); }
+                Promise.resolve(HW.update({
+                    timers: JSON.stringify(timers),
+                    windows: JSON.stringify(WINDOWS)
+                })).catch(() => {});
+            } catch (e) { console.error('Update failed', e); }
         }
 
-        // The widget's "Replant all" button opens the app, which replants and goes back to the home screen.
-        function setupWidget() {
+        // Called after any change to the timers.
+        async function syncNotifications() {
+            pushWidgetData();
+        }
+
+        // Picks up changes made by the notification / widget replant buttons while the app wasn't looking.
+        async function pullNativeState() {
             if (!HW) return;
             try {
-                HW.addListener('replantRequested', async () => {
-                    await replantAll();
-                    try { await HW.moveToBack(); } catch (e) {}
-                });
-            } catch (e) { console.error('Widget setup failed', e); }
-        }
-
-        // Replants every patch that is ready. If nothing is planted at all, plants every patch.
-        async function replantAll() {
-            const anyTimer = patches.some(p => localStorage.getItem(`finish_${p.id}`));
-            if (anyTimer) {
-                await restartFinishedTimers();
-            } else {
-                const finishTime = getFirstTick(new Date()).getTime() + GROW_MS;
-                patches.forEach(p => localStorage.setItem(`finish_${p.id}`, finishTime.toString()));
-                updateAll();
-                await syncNotifications();
-            }
+                const state = await HW.getState();
+                if (state && state.dirty) {
+                    JSON.parse(state.timers || '[]').forEach(t => {
+                        if (t.finish > 0) localStorage.setItem(`finish_${t.id}`, String(t.finish));
+                        else localStorage.removeItem(`finish_${t.id}`);
+                    });
+                    await HW.clearDirty();
+                    updateAll();
+                }
+            } catch (e) { console.error('Could not read native state', e); }
         }
 
         // ---------- Farming tick settings ----------
@@ -683,6 +592,9 @@
             document.getElementById('tick-cancel').style.display = firstRun ? 'none' : '';
             document.getElementById('tick-modal').hidden = false;
         }
+
+        function openAbout() { document.getElementById('about-modal').hidden = false; }
+        function closeAbout() { document.getElementById('about-modal').hidden = true; }
 
         function closeTickSettings() {
             document.getElementById('tick-modal').hidden = true;
@@ -810,19 +722,6 @@
             syncNotifications();
         }
 
-        // "Restart all" button on the notification: replants every patch that is ready to harvest.
-        async function restartFinishedTimers() {
-            const now = Date.now();
-            const newFinish = getFirstTick(new Date(now)).getTime() + GROW_MS;
-            patches.forEach(p => {
-                const finish = parseInt(localStorage.getItem(`finish_${p.id}`));
-                if (finish && finish <= now) localStorage.setItem(`finish_${p.id}`, newFinish.toString());
-            });
-            if (LN) { try { await LN.removeAllDeliveredNotifications(); } catch (e) {} }
-            updateAll();
-            await syncNotifications();
-        }
-
         // Takes exactly 20 minutes (one stage) off every growing timer.
         function skipToNextTick() {
             const now = Date.now();
@@ -898,8 +797,6 @@
             const tickTimeEl = document.getElementById('global-tick-time');
             if (tickTimeEl) tickTimeEl.innerText = formatClock(nextTick.getTime());
 
-            updateRunningNotification();
-
             // Plant All button status
             const plantText = document.getElementById('plant-text');
             const plantAllBtn = document.getElementById('plant-all-btn');
@@ -921,9 +818,14 @@
             initData();
             // First time the app opens: ask for the farming tick
             if (!localStorage.getItem('tick_windows')) openTickSettings(true);
+            await pullNativeState();      // must come before the first push, so nothing gets overwritten
             await setupNotifications();
-            setupWidget();
             syncNotifications();
+
+            // Keep in step with the notification / widget replant buttons
+            setInterval(pullNativeState, 3000);
+            document.addEventListener('visibilitychange', () => { if (!document.hidden) pullNativeState(); });
+            document.addEventListener('resume', pullNativeState);
         };
     </script>
 </body>
