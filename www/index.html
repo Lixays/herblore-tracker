@@ -287,6 +287,83 @@
         }
         .ready-flash { animation: flashRed 1s infinite alternate; border-color: var(--osrs-red-text) !important; color: #b8ab8c; }
         .flash-alert { animation: flashRed 1s infinite alternate; border-color: var(--osrs-red-text) !important; }
+
+        /* ---------- Settings gear + farming tick pop-up ---------- */
+        .gear-btn { cursor: pointer; padding: 0; font: inherit; color: inherit; }
+        .gear-btn svg { width: calc(var(--u) * 17); height: calc(var(--u) * 17); fill: var(--osrs-gold-text); }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            display: flex;
+            padding: 16px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.8);
+        }
+        .modal-overlay[hidden] { display: none; }
+        .modal-card {
+            margin: auto;
+            width: 100%;
+            max-width: 340px;
+            padding: 18px 16px;
+            text-align: center;
+            border: 4px solid #3b2c1f;
+            border-radius: 6px;
+        }
+        .modal-title {
+            font-family: 'Cinzel', serif;
+            font-size: 22px;
+            font-weight: 900;
+            color: var(--osrs-gold-text);
+            margin: 0 0 8px;
+        }
+        .modal-text {
+            font-family: 'Roboto Mono', monospace;
+            font-size: 12.5px;
+            line-height: 1.45;
+            color: #8c7f62;
+            margin: 0 0 14px;
+        }
+        .tick-inputs { display: flex; justify-content: center; gap: 10px; margin-bottom: 6px; }
+        .tick-inputs label {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            font-family: 'Cinzel', serif;
+            font-size: 12px;
+            font-weight: 700;
+            color: #8c7f62;
+        }
+        .tick-inputs input {
+            width: 64px;
+            padding: 8px 4px;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 22px;
+            font-weight: 700;
+            text-align: center;
+            color: var(--osrs-gold-text);
+            background: #090604;
+            border: 2px solid #41321f;
+            border-radius: 4px;
+            outline: none;
+            user-select: text;
+            -webkit-user-select: text;
+            -moz-appearance: textfield;
+        }
+        .tick-inputs input:focus { border-color: var(--osrs-gold-text); }
+        .tick-inputs input::-webkit-outer-spin-button,
+        .tick-inputs input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .modal-error {
+            min-height: 16px;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 12px;
+            color: var(--osrs-red-text);
+        }
+        .modal-actions { display: flex; gap: 10px; margin-top: 10px; }
+        .modal-btn { flex: 1; padding: 10px 0; font-size: 14px; letter-spacing: 0; }
+        .modal-save { color: var(--osrs-gold-text); }
     </style>
 </head>
 <body>
@@ -305,9 +382,9 @@
                 <img src="https://oldschool.runescape.wiki/images/Watering_can%288%29.png" alt="Watering Can">
             </div>
             <h1 class="osrs-font-title">Herb Patch Timers</h1>
-            <div class="header-badge">
-                <img src="https://oldschool.runescape.wiki/images/Watering_can%288%29.png" alt="Watering Can">
-            </div>
+            <button class="header-badge gear-btn" onclick="openTickSettings(false)" aria-label="Farming tick settings">
+                <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+            </button>
         </div>
 
         <!-- PATCH GRID (patch cards are added by the script; the last three cells are fixed) -->
@@ -347,9 +424,38 @@
 
     </div>
 
+    <!-- FARMING TICK SETTINGS -->
+    <div class="modal-overlay" id="tick-modal" hidden>
+        <div class="modal-card osrs-panel">
+            <h2 class="modal-title">Farming Tick</h2>
+            <p class="modal-text">Enter the minutes past the hour when your herb patches tick. Ticks are 20 minutes apart, so the other two fill in automatically.</p>
+            <div class="tick-inputs">
+                <label>Tick 1<input id="tick-in-0" type="number" inputmode="numeric" min="0" max="59" onchange="onTickInputChange(0)"></label>
+                <label>Tick 2<input id="tick-in-1" type="number" inputmode="numeric" min="0" max="59" onchange="onTickInputChange(1)"></label>
+                <label>Tick 3<input id="tick-in-2" type="number" inputmode="numeric" min="0" max="59" onchange="onTickInputChange(2)"></label>
+            </div>
+            <div class="modal-error" id="tick-error"></div>
+            <div class="modal-actions">
+                <button class="osrs-btn modal-btn" id="tick-cancel" onclick="closeTickSettings()">Cancel</button>
+                <button class="osrs-btn modal-btn modal-save" onclick="saveTickSettings()">Save</button>
+            </div>
+        </div>
+    </div>
+
     <!-- SCRIPT -->
     <script>
-        const WINDOWS = [9, 29, 49];
+        // Minutes past the hour when herb patches tick (20 minutes apart). Editable via the gear button.
+        const DEFAULT_WINDOWS = [9, 29, 49];
+        function loadWindows() {
+            try {
+                const w = JSON.parse(localStorage.getItem('tick_windows'));
+                if (Array.isArray(w) && w.length === 3 && w.every(n => Number.isInteger(n) && n >= 0 && n <= 59)) {
+                    return w.slice().sort((a, b) => a - b);
+                }
+            } catch (e) {}
+            return DEFAULT_WINDOWS.slice();
+        }
+        let WINDOWS = loadWindows();
         const STAGE_MS = 20 * 60 * 1000;
         const GROW_MS = 60 * 60 * 1000;
         const HOLD_MS = 5000;      // hold the Next Tick card this long for test mode
@@ -468,6 +574,7 @@
         // Re-schedules every "ready" notification from the saved timers.
         // Patches finishing at the same moment share one notification.
         async function syncNotifications() {
+            pushWidgetData();
             if (!LN) return;
             try {
                 const pending = await LN.getPending();
@@ -504,6 +611,100 @@
             await updateRunningNotification(true);
         }
         // -------------------------------------------------------
+
+        // ---------- Home-screen widget ----------
+        const HW = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.HerbWidget;
+
+        // Gives the widget the current timers so it can show the soonest one.
+        function pushWidgetData() {
+            if (!HW) return;
+            try {
+                const timers = patches.map(p => ({
+                    name: p.name,
+                    finish: parseInt(localStorage.getItem(`finish_${p.id}`)) || 0
+                }));
+                Promise.resolve(HW.update({ timers: JSON.stringify(timers) })).catch(() => {});
+            } catch (e) { console.error('Widget update failed', e); }
+        }
+
+        // The widget's "Replant all" button opens the app, which replants and goes back to the home screen.
+        function setupWidget() {
+            if (!HW) return;
+            try {
+                HW.addListener('replantRequested', async () => {
+                    await replantAll();
+                    try { await HW.moveToBack(); } catch (e) {}
+                });
+            } catch (e) { console.error('Widget setup failed', e); }
+        }
+
+        // Replants every patch that is ready. If nothing is planted at all, plants every patch.
+        async function replantAll() {
+            const anyTimer = patches.some(p => localStorage.getItem(`finish_${p.id}`));
+            if (anyTimer) {
+                await restartFinishedTimers();
+            } else {
+                const finishTime = getFirstTick(new Date()).getTime() + GROW_MS;
+                patches.forEach(p => localStorage.setItem(`finish_${p.id}`, finishTime.toString()));
+                updateAll();
+                await syncNotifications();
+            }
+        }
+
+        // ---------- Farming tick settings ----------
+        function pad2(n) { return String(n).padStart(2, '0'); }
+
+        function fillTickInputs(w) {
+            [0, 1, 2].forEach(i => { document.getElementById(`tick-in-${i}`).value = pad2(w[i]); });
+        }
+
+        // Ticks are always 20 minutes apart, so any one box decides the other two.
+        function windowsFromBox(value, boxIndex) {
+            const base = (((value - 20 * boxIndex) % 60) + 60) % 60;
+            const first = base % 20;
+            return [first, first + 20, first + 40];
+        }
+
+        function onTickInputChange(i) {
+            const value = parseInt(document.getElementById(`tick-in-${i}`).value, 10);
+            const error = document.getElementById('tick-error');
+            if (isNaN(value) || value < 0 || value > 59) {
+                error.innerText = 'Enter a minute between 0 and 59';
+                return false;
+            }
+            error.innerText = '';
+            fillTickInputs(windowsFromBox(value, i));
+            return true;
+        }
+
+        function openTickSettings(firstRun) {
+            fillTickInputs(WINDOWS);
+            document.getElementById('tick-error').innerText = '';
+            document.getElementById('tick-cancel').style.display = firstRun ? 'none' : '';
+            document.getElementById('tick-modal').hidden = false;
+        }
+
+        function closeTickSettings() {
+            document.getElementById('tick-modal').hidden = true;
+        }
+
+        function saveTickSettings() {
+            // If a box is still being edited, apply it first
+            const active = document.activeElement;
+            if (active && active.id && active.id.indexOf('tick-in-') === 0) {
+                if (!onTickInputChange(parseInt(active.id.slice(-1), 10))) return;
+            }
+            const first = parseInt(document.getElementById('tick-in-0').value, 10);
+            if (isNaN(first) || first < 0 || first > 59) {
+                document.getElementById('tick-error').innerText = 'Enter a minute between 0 and 59';
+                return;
+            }
+            WINDOWS = windowsFromBox(first, 0);
+            localStorage.setItem('tick_windows', JSON.stringify(WINDOWS));
+            closeTickSettings();
+            updateAll();
+            syncNotifications();
+        }
 
         function getFirstTick(now) {
             let m = now.getMinutes();
@@ -718,7 +919,10 @@
 
         window.onload = async () => {
             initData();
+            // First time the app opens: ask for the farming tick
+            if (!localStorage.getItem('tick_windows')) openTickSettings(true);
             await setupNotifications();
+            setupWidget();
             syncNotifications();
         };
     </script>
