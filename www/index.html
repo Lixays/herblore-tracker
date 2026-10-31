@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-    <title>Herb Farming Timers</title>
+    <title>Herb Timer</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -290,8 +290,6 @@
 
         /* ---------- Settings gear + farming tick pop-up ---------- */
         .gear-btn { cursor: pointer; padding: 0; font: inherit; color: inherit; }
-        /* Turns the watering can the same gold as the cog */
-        .gold-icon { filter: brightness(0) saturate(100%) invert(47%) sepia(57%) saturate(1158%) hue-rotate(18deg) brightness(81%) contrast(94%); }
         .about-text { font-size: 14px; line-height: 1.55; margin-bottom: 4px; }
         .gear-btn svg { width: calc(var(--u) * 17); height: calc(var(--u) * 17); fill: var(--osrs-gold-text); }
 
@@ -382,7 +380,7 @@
         <!-- HEADER -->
         <div class="app-header">
             <button class="header-badge gear-btn" onclick="openAbout()" aria-label="About">
-                <img class="gold-icon" src="https://oldschool.runescape.wiki/images/Watering_can%288%29.png" alt="Watering Can">
+                <img src="data:image/png;base64,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" alt="About">
             </button>
             <h1 class="osrs-font-title">Herb Patch Timers</h1>
             <button class="header-badge gear-btn" onclick="openTickSettings(false)" aria-label="Farming tick settings">
@@ -448,7 +446,7 @@
     <!-- ABOUT -->
     <div class="modal-overlay" id="about-modal" hidden onclick="if (event.target === this) closeAbout()">
         <div class="modal-card osrs-panel">
-            <p class="modal-text about-text">Heyo! I use a similar timer on PC on a side display for tracking different herb patches. Using AI I've transfered that into an app with some other features for a QOL mobile timer. If you've set your farming tick up wrong you can fix that in the settings. Make sure you give notification/timer permissions for this to work. You can reset all timers from the notification so you don't have to tab out of Scape. Do what you want with this app. Just don't sell it. Selling AI stuff is fucking stupid. Cheers, Rikku.</p>
+            <p class="modal-text about-text">Heyo! I use a similar timer on PC with a side display for tracking different herb patches. Using AI I've transfered that into an app with some other features for a QOL mobile timer. If you've set your farming tick up wrong you can fix that in the settings. Make sure you give notification/timer permissions for this to work. You can reset all timers from the notification so you don't have to tab out of Scape. Do what you want with this app. Just don't sell it. Selling AI stuff is fucking stupid. Cheers, Rikku.</p>
             <div class="modal-actions">
                 <button class="osrs-btn modal-btn modal-save" onclick="closeAbout()">Close</button>
             </div>
