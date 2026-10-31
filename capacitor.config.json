@@ -1,5 +1,10 @@
 {
   "appId": "com.example.herbloretracker",
   "appName": "Herblore Tracker",
-  "webDir": "www"
+  "webDir": "www",
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_herb"
+    }
+  }
 }

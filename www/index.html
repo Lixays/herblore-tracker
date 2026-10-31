@@ -384,7 +384,6 @@
         const LN = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications;
 
         const NOTIF_ICON = 'ic_stat_herb';   // status-bar icon (android-res/drawable-*/ic_stat_herb.png)
-        const NOTIF_COLOR = '#9a7208';
         const RUNNING_ID = 1000;             // the "timers running" notification
         let notificationsReady = false;
         let lastRunningKey = null;
@@ -460,7 +459,6 @@
                     body: `${running.length} growing · next ready ${formatClock(next)}`,
                     channelId: 'herb-running',
                     smallIcon: NOTIF_ICON,
-                    iconColor: NOTIF_COLOR,
                     ongoing: true,
                     autoCancel: false
                 }] });
@@ -496,8 +494,7 @@
                         largeBody: `${names} ready to harvest.\nRestart now and they'll next be done at ${restartDone}.`,
                         channelId: 'herb-timers',
                         smallIcon: NOTIF_ICON,
-                        iconColor: NOTIF_COLOR,
-                        actionTypeId: 'HERB_DONE',
+                            actionTypeId: 'HERB_DONE',
                         schedule: { at: new Date(finishAt), allowWhileIdle: true }
                     };
                 });

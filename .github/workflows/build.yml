@@ -10,6 +10,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check icon files were uploaded
+        run: |
+          for f in android-res/mipmap-xxxhdpi/ic_launcher.png android-res/mipmap-xxxhdpi/ic_launcher_foreground.png android-res/mipmap-anydpi-v26/ic_launcher.xml android-res/values/herb_icon_colors.xml android-res/drawable-xxxhdpi/ic_stat_herb.png; do
+            if [ ! -f "$f" ]; then echo "MISSING FILE: $f - upload the android-res folder again"; exit 1; fi
+          done
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -24,6 +30,11 @@ jobs:
           npm install
           npx cap add android
 
+      - name: Apply app icon
+        run: |
+          find android/app/src/main/res -name "ic_launcher*.webp" -delete
+          cp -r android-res/. android/app/src/main/res/
+
       - name: Add notification permissions
         run: |
           sed -i 's|<application|<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>\n    <application|' android/app/src/main/AndroidManifest.xml
@@ -34,6 +45,9 @@ jobs:
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
+
+      - name: Show icons inside the APK
+        run: unzip -l android/app/build/outputs/apk/debug/app-debug.apk | grep -i "ic_launcher\|ic_stat" || true
 
       - uses: actions/upload-artifact@v4
         with:
