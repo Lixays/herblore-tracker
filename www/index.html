@@ -1,220 +1,402 @@
 <!DOCTYPE html>
-<html lang="en">  
-<head> 
-    <meta charset="UTF-8"> 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"> 
-    <title>OSRS Herblore Tracker</title> 
-    <style> 
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Roboto+Mono:wght@500&display=swap');
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+    <title>Herb Farming Timers</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=VT323&family=Roboto+Mono:wght@500;700&display=swap" rel="stylesheet">
 
-        * { box-sizing: border-box; } 
+    <style>
+        :root {
+            --osrs-bg-dark: #080604;
+            --osrs-gold-text: #9a7208;
+            --osrs-yellow-text: #cccc00;
+            --osrs-green-text: #247024;
+            --osrs-red-text: #a02c2c;
 
-        body { 
-            margin: 0; 
-            padding: 12px; 
-            background-color: #121212; 
-            color: #DECDA6; 
-            font-family: 'Cinzel', serif; 
-            letter-spacing: 1px; 
-            display: flex; 
-            flex-direction: column; 
-            height: 100vh; 
-            overflow: hidden; 
+            /* Screen edges (status bar / gesture bar) */
+            --sat: max(8px, env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
+            --sab: max(8px, env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+            --sal: max(8px, env(safe-area-inset-left, 0px));
+            --sar: max(8px, env(safe-area-inset-right, 0px));
+            --vh: 100vh;
+
+            /* Layout. --u is one "unit" of size; every font, icon and gap is a multiple of it,
+               so the whole app scales to fit the screen with no scrolling.
+               Portrait phone = 2 columns. Landscape / wide = 3 columns. */
+            --cols: 2;
+            --panel-u: 214;   /* panel width in units */
+            --h-u: 450;       /* panel height in units */
+            --h-px: 64px;     /* fixed pixel parts of the height (borders, gaps) */
+            --u: min(
+                calc((100vw - var(--sal) - var(--sar) - 28px) / var(--panel-u)),
+                calc((var(--vh) - var(--sat) - var(--sab) - var(--h-px)) / var(--h-u))
+            );
+        }
+        @supports (height: 100dvh) { :root { --vh: 100dvh; } }
+        @media (orientation: landscape) {
+            :root { --cols: 3; --panel-u: 316; --h-u: 345; --h-px: 52px; }
         }
 
-        .grid-container { 
-            display: grid; 
-            grid-template-columns: repeat(3, 1fr); 
-            grid-template-rows: repeat(3, 1fr) auto; 
-            gap: 8px; 
-            flex-grow: 1; 
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
             height: 100%;
-        } 
-
-        .patch-card { 
-            background: linear-gradient(145deg, #1e1b15, #14120e); 
-            border: 2px solid #3a3224; 
-            border-radius: 6px; 
-            padding: 6px 8px; 
-            text-align: center; 
-            box-shadow: 3px 3px 6px rgba(0,0,0,0.6); 
-            display: flex; 
-            flex-direction: column; 
-            justify-content: space-between; 
-            height: 100%; 
-            cursor: pointer;
-        } 
-
-        .patch-name { 
-            font-size: 15px; 
-            color: #DECDA6; 
-            text-shadow: 1px 1px #000; 
-            white-space: nowrap; 
-            overflow: hidden; 
-            text-overflow: ellipsis; 
-            pointer-events: none;
-        } 
-
-        .timer-display-wrapper { 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            flex-direction: column; 
-            margin: auto 0; 
-            gap: 2px; 
-            pointer-events: none; 
-        } 
-        .timer-row { display: flex; align-items: center; gap: 6px; pointer-events: none; } 
-        .farming-icon { width: 34px; height: 34px; object-fit: contain; image-rendering: pixelated; } 
-        .uim-icon { width: 22px; height: 22px; image-rendering: pixelated; } 
-        .secateurs-icon { width: 26px; height: 26px; image-rendering: pixelated; } 
-        .spade-icon { width: 26px; height: 26px; image-rendering: pixelated; } 
-
-        .timer { 
-            font-family: 'Roboto Mono', monospace; 
-            font-size: 14px; 
-            font-weight: bold; 
-            color: #55FF55; 
-            text-shadow: 2px 2px #000; 
-            min-width: 75px; 
-        } 
-        .cycle-text { font-family: 'Roboto Mono', monospace; font-size: 11px; color: #aaa; pointer-events: none; } 
-
-        .btn { 
-            background-color: #4a3b2c; 
-            border: 1px solid #735d44; 
-            color: #DECDA6; 
-            padding: 8px 0; 
-            font-family: 'Cinzel', serif; 
-            font-size: 12px; 
-            cursor: pointer; 
-            border-radius: 4px; 
-            width: 100%; 
-            text-transform: uppercase; 
-            pointer-events: none;
-        } 
-        .btn.ready-flash { animation: flashRed 1s infinite alternate; border-color: #FF5555; color: #fff; } 
-        
-        .global-card { 
-            background: linear-gradient(145deg, #1e1b15, #14120e); 
-            border: 2px solid #3a3224; 
-            border-radius: 6px; 
-            padding: 6px 8px; 
-            text-align: center; 
-            box-shadow: 3px 3px 6px rgba(0,0,0,0.6); 
-            display: flex; 
-            flex-direction: column; 
-            justify-content: space-between; 
-            height: 100%; 
-            grid-column: span 1;
-        }
-
-        .btn-large { 
-            padding: 2px 4px; 
-            font-size: 14px; 
-            font-weight: bold; 
-            border: 2px solid #735d44; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            cursor: pointer; 
-            border-radius: 4px; 
-            text-transform: uppercase; 
-            width: 100%; 
-            height: 40px; 
-        } 
-        .btn-large.plant { color: #55FF55; background-color: #4a3b2c; } 
-        .btn-large.reset { color: #FF5555; background-color: #4a3b2c; } 
-        .btn-inner { display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; } 
-        .btn-large.plant.flash-alert { animation: flashRed 1s infinite alternate; border-color: #FF5555; } 
-        
-        @keyframes flashRed { 
-            0% { background-color: #4a3b2c; } 
-            100% { background-color: #8b0000; } 
-        } 
-
-        /* ===== Fit-to-screen layout: everything scales with its card, no scrolling ===== */
-        html { height: 100%; overflow: hidden; }
-        body {
-            height: 100vh;
-            height: 100dvh;
-            padding-top: max(8px, env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
-            padding-right: max(8px, env(safe-area-inset-right, 0px));
-            padding-bottom: max(8px, env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
-            padding-left: max(8px, env(safe-area-inset-left, 0px));
             overflow: hidden;
             overscroll-behavior: none;
-            -webkit-user-select: none;
+            background-color: var(--osrs-bg-dark);
+            color: #8c7f62;
+            font-family: 'VT323', monospace;
             user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            background-image: radial-gradient(#1a120b 1px, transparent 1px);
+            background-size: 16px 16px;
         }
-        .grid-container {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            grid-template-rows: repeat(4, minmax(0, 1fr));
-            gap: 6px;
+
+        body {
+            height: var(--vh);
+            padding: var(--sat) var(--sar) var(--sab) var(--sal);
+        }
+
+        img { display: block; }
+        button { font: inherit; }
+
+        .app-viewport-container {
+            width: 100%;
+            max-width: calc(var(--u) * var(--panel-u) + 28px);
             height: 100%;
-            min-height: 0;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            padding: 10px;
+            border: 4px solid #3b2c1f;
         }
-        .patch-card, .global-card {
-            container-type: size;   /* lets children size themselves from the card's own width/height */
+
+        .osrs-font-title {
+            font-family: 'Cinzel', serif;
+            letter-spacing: 0.5px;
+            font-size: calc(var(--u) * 11);
+            font-weight: 900;
+            color: var(--osrs-gold-text);
+            margin: 0;
+            white-space: nowrap;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.9));
+        }
+
+        .osrs-panel {
+            background: linear-gradient(135deg, #1a120c 0%, #0e0a07 100%);
+            box-shadow: inset 0 0 10px #000000, 0 4px 12px rgba(0,0,0,0.8);
+            position: relative;
+        }
+
+        /* ---------- Header ---------- */
+        .app-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 calc(var(--u) * 2);
+            margin-bottom: 6px;
+            flex-shrink: 0;
+        }
+        .header-badge {
+            width: calc(var(--u) * 28);
+            height: calc(var(--u) * 28);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #090604;
+            border-radius: 50%;
+            border: 2px solid #4a3825;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.6);
+            flex-shrink: 0;
+        }
+        .header-badge img {
+            width: calc(var(--u) * 17);
+            height: calc(var(--u) * 17);
+            object-fit: contain;
+            image-rendering: pixelated;
+        }
+
+        /* ---------- Grid ---------- */
+        .patch-grid {
+            display: grid;
+            grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+            gap: 6px;
+            align-content: start;   /* rows only as tall as their content */
+        }
+
+        /* Order of the last three cells.
+           Portrait:  ... Guild | Next Tick  then  Reset | Plant All
+           Landscape: ... then  Reset | Next Tick | Plant All (Next Tick = bottom middle) */
+        #tick-card { order: 10; }
+        #reset-btn { order: 11; }
+        #plant-all-btn { order: 12; }
+        @media (orientation: landscape) {
+            #reset-btn { order: 10; }
+            #tick-card { order: 11; }
+        }
+
+        /* ---------- Cards ---------- */
+        .osrs-card {
+            background: radial-gradient(circle, #150f0a 0%, #090604 100%);
+            border: 2px solid #281d14;
+            box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.9), 0 2px 5px rgba(0, 0, 0, 0.5);
+            border-radius: 4px;
+            padding: calc(var(--u) * 4);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: calc(var(--u) * 2.5);
             min-width: 0;
-            min-height: 0;
-            padding: 3%;
-            overflow: hidden;
+            cursor: pointer;
+            transition: border-color 0.2s ease;
         }
-        .patch-name { font-size: min(12cqw, 14cqh); }
-        .timer-display-wrapper { gap: 1cqh; min-height: 0; max-width: 100%; }
-        .timer-row { gap: 2.5cqw; max-width: 100%; justify-content: center; }
-        .farming-icon { width: min(17cqw, 24cqh); height: min(17cqw, 24cqh); flex-shrink: 0; }
-        .timer { font-size: min(10.5cqw, 13cqh); min-width: 0; white-space: nowrap; }
-        .cycle-text { font-size: min(8.5cqw, 10cqh); }
-        .btn { font-size: min(9.5cqw, 12cqh); padding: min(4cqw, 5cqh) 0; letter-spacing: 0; }
-        .btn-large {
-            height: min(60cqh, 38cqw);
-            font-size: min(8cqw, 22cqh);
+        @media (hover: hover) { .osrs-card:hover { border-color: #4a3825; } }
+
+        .patch-name-text {
+            font-family: 'Cinzel', serif;
+            font-size: calc(var(--u) * 11);
+            line-height: 1.15;
+            font-weight: 700;
+            color: var(--osrs-gold-text);
+            text-shadow: 1px 1px #000;
+            max-width: 100%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .timer-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: calc(var(--u) * 2.5);
+            max-width: 100%;
+        }
+        .farming-icon {
+            width: calc(var(--u) * 17);
+            height: calc(var(--u) * 17);
+            object-fit: contain;
+            image-rendering: pixelated;
+            flex-shrink: 0;
+        }
+        .uim-icon {
+            width: calc(var(--u) * 12);
+            height: calc(var(--u) * 12);
+            image-rendering: pixelated;
+            flex-shrink: 0;
+        }
+        .timer {
+            font-family: 'Roboto Mono', monospace;
+            font-size: calc(var(--u) * 10.5);
+            font-weight: bold;
+            color: var(--osrs-green-text);
+            text-shadow: 2px 2px #000;
+            white-space: nowrap;
+        }
+        .cycle-text {
+            font-family: 'Roboto Mono', monospace;
+            font-size: calc(var(--u) * 8.5);
+            line-height: 1.1;
+            min-height: 1.1em;      /* keeps the card the same height when the line is empty */
+            color: #5e5a52;
+            white-space: nowrap;
+        }
+
+        .osrs-btn {
+            background: linear-gradient(180deg, #2e2218 0%, #1b140e 100%);
+            border: 2px solid #41321f;
+            border-bottom-color: #120c08;
+            border-right-color: #120c08;
+            color: #8c7f62;
+            font-family: 'Cinzel', serif;
+            font-weight: 700;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.6);
+            cursor: pointer;
+            text-transform: uppercase;
+            border-radius: 4px;
+        }
+        @media (hover: hover) { .osrs-btn:hover { background: linear-gradient(180deg, #3a2c1f 0%, #251b13 100%); color: #b8ab8c; } }
+
+        /* The finish-time button at the bottom of each card */
+        .card-btn {
+            width: 100%;
+            margin-top: auto;
+            padding: calc(var(--u) * 3) 0;
+            font-size: calc(var(--u) * 10);
+            line-height: 1.1;
+            pointer-events: none;
+        }
+
+        /* Next Tick card */
+        .tick-card { position: relative; overflow: hidden; touch-action: manipulation; }
+        .tick-card .timer { color: var(--osrs-green-text); }
+        .hold-bar {
+            position: absolute;
+            left: 0; bottom: 0;
+            height: calc(var(--u) * 2.5);
+            width: 0;
+            background: var(--osrs-gold-text);
+            opacity: 0;
+            pointer-events: none;
+        }
+        .tick-card.holding .hold-bar { opacity: 1; width: 100%; transition: width 5s linear; }
+
+        /* Reset / Plant All buttons */
+        .ctrl-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: calc(var(--u) * 34);
+            padding: calc(var(--u) * 3) 2px;
+            font-size: calc(var(--u) * 9);
             letter-spacing: 0;
-            padding: 0 2px;
+            white-space: nowrap;
             overflow: hidden;
+            min-width: 0;
         }
-        .btn-inner { gap: 2cqw; }
-        .uim-icon, .spade-icon, .secateurs-icon { width: min(13cqw, 30cqh); height: min(13cqw, 30cqh); flex-shrink: 0; }
-    </style> 
-</head> 
-<body> 
-    <div class="grid-container" id="patches-grid"></div> 
+        .ctrl-inner { display: flex; align-items: center; gap: calc(var(--u) * 2.5); font-weight: 700; }
+        .ctrl-reset .ctrl-inner { color: #a32525; }
+        .ctrl-plant .ctrl-inner { color: #1e7a3d; }
 
-    <script> 
-        const WINDOWS = [9, 29, 49]; 
-        const herbs = [ 
-            { name: 'Ranarr', icon: 'https://oldschool.runescape.wiki/images/Grimy_ranarr_weed.png' }, 
-            { name: 'Toadflax', icon: 'https://oldschool.runescape.wiki/images/Grimy_toadflax.png' }, 
-            { name: 'Irit', icon: 'https://oldschool.runescape.wiki/images/Grimy_irit_leaf.png' }, 
-            { name: 'Avantoe', icon: 'https://oldschool.runescape.wiki/images/Grimy_avantoe.png' }, 
-            { name: 'Kwuarm', icon: 'https://oldschool.runescape.wiki/images/Grimy_kwuarm.png' }, 
-            { name: 'Snapdragon', icon: 'https://oldschool.runescape.wiki/images/Grimy_snapdragon.png' }, 
-            { name: 'Cadantine', icon: 'https://oldschool.runescape.wiki/images/Grimy_cadantine.png' }, 
-            { name: 'Dwarf Weed', icon: 'https://oldschool.runescape.wiki/images/Grimy_dwarf_weed.png' }, 
-            { name: 'Torstol', icon: 'https://oldschool.runescape.wiki/images/Grimy_torstol.png' } 
-        ]; 
+        /* ---------- Corner flourishes ---------- */
+        .corner-flourish {
+            position: absolute;
+            width: max(26px, calc(var(--u) * 24));
+            height: max(26px, calc(var(--u) * 24));
+            pointer-events: none;
+            z-index: 10;
+            filter: brightness(0.72);
+        }
+        .corner-tl { top: -2px; left: -2px; }
+        .corner-tr { top: -2px; right: -2px; transform: scaleX(-1); }
+        .corner-bl { bottom: -2px; left: -2px; transform: scaleY(-1); }
+        .corner-br { bottom: -2px; right: -2px; transform: scale(-1, -1); }
 
-        const patches = [ 
-            { id: 'ardougne', name: 'Ardougne', icon: 'https://oldschool.runescape.wiki/images/Ardougne_cloak_4.png' }, 
-            { id: 'varlamore', name: 'Varlamore', icon: 'https://oldschool.runescape.wiki/images/Perfected_quetzal_whistle.png' }, 
-            { id: 'ecto', name: 'Morytania', icon: 'https://oldschool.runescape.wiki/images/Ectophial.png' }, 
-            { id: 'catherby', name: 'Catherby', icon: 'https://oldschool.runescape.wiki/images/Catherby_Teleport_icon_%28mobile%29.png' }, 
-            { id: 'weiss', name: 'Weiss', icon: 'https://oldschool.runescape.wiki/images/Icy_basalt.png' }, 
-            { id: 'stronghold', name: 'Stronghold', icon: 'https://oldschool.runescape.wiki/images/Stony_basalt.png' }, 
-            { id: 'hosidius', name: 'Hosidius', icon: 'https://oldschool.runescape.wiki/images/Teleport_to_House_icon_%28mobile%29.png?a9d3d' }, 
-            { id: 'cabbage', name: 'Falador', icon: 'https://oldschool.runescape.wiki/images/Cabbage.png' }, 
-            { id: 'farming_guild', name: 'Farming Guild', icon: 'https://oldschool.runescape.wiki/images/thumb/Seed_pack_detail.png/150px-Seed_pack_detail.png?2567b' }, 
-        ]; 
+        @keyframes flashRed {
+            0% { background-color: #281d14; }
+            100% { background-color: #440000; }
+        }
+        .ready-flash { animation: flashRed 1s infinite alternate; border-color: var(--osrs-red-text) !important; color: #b8ab8c; }
+        .flash-alert { animation: flashRed 1s infinite alternate; border-color: var(--osrs-red-text) !important; }
+    </style>
+</head>
+<body>
+
+    <div class="app-viewport-container osrs-panel">
+
+        <!-- Gold Decorative Corners -->
+        <svg class="corner-flourish corner-tl" viewBox="0 0 50 50"><path d="M2,2 L2,20 C2,12 12,2 20,2 Z" fill="#b38626" stroke="#3d290a" stroke-width="2"/><circle cx="8" cy="8" r="3" fill="#cca34d"/><path d="M2,2 L48,2 L48,6 L6,6 L6,48 L2,48 Z" fill="#a6771c"/></svg>
+        <svg class="corner-flourish corner-tr" viewBox="0 0 50 50"><path d="M2,2 L2,20 C2,12 12,2 20,2 Z" fill="#b38626" stroke="#3d290a" stroke-width="2"/><circle cx="8" cy="8" r="3" fill="#cca34d"/><path d="M2,2 L48,2 L48,6 L6,6 L6,48 L2,48 Z" fill="#a6771c"/></svg>
+        <svg class="corner-flourish corner-bl" viewBox="0 0 50 50"><path d="M2,2 L2,20 C2,12 12,2 20,2 Z" fill="#b38626" stroke="#3d290a" stroke-width="2"/><circle cx="8" cy="8" r="3" fill="#cca34d"/><path d="M2,2 L48,2 L48,6 L6,6 L6,48 L2,48 Z" fill="#a6771c"/></svg>
+        <svg class="corner-flourish corner-br" viewBox="0 0 50 50"><path d="M2,2 L2,20 C2,12 12,2 20,2 Z" fill="#b38626" stroke="#3d290a" stroke-width="2"/><circle cx="8" cy="8" r="3" fill="#cca34d"/><path d="M2,2 L48,2 L48,6 L6,6 L6,48 L2,48 Z" fill="#a6771c"/></svg>
+
+        <!-- HEADER -->
+        <div class="app-header">
+            <div class="header-badge">
+                <img src="https://oldschool.runescape.wiki/images/Watering_can%288%29.png" alt="Watering Can">
+            </div>
+            <h1 class="osrs-font-title">Herb Patch Timers</h1>
+            <div class="header-badge">
+                <img src="https://oldschool.runescape.wiki/images/Watering_can%288%29.png" alt="Watering Can">
+            </div>
+        </div>
+
+        <!-- PATCH GRID (patch cards are added by the script; the last three cells are fixed) -->
+        <div class="patch-grid" id="patches-grid">
+
+            <!-- Next Tick: tap = skip to next tick, hold 5s = set all active timers to 10s -->
+            <div class="osrs-card tick-card" id="tick-card">
+                <div class="patch-name-text">Next Tick</div>
+                <div class="timer-row">
+                    <img class="farming-icon" src="https://oldschool.runescape.wiki/images/Watering_can%288%29.png" alt="">
+                    <div class="timer" id="global-tick-timer">--:--</div>
+                    <img class="farming-icon" src="https://oldschool.runescape.wiki/images/Watering_can%288%29.png" alt="">
+                </div>
+                <div class="cycle-text">Tap to skip</div>
+                <button class="osrs-btn card-btn" id="global-tick-time">--:--</button>
+                <div class="hold-bar"></div>
+            </div>
+
+            <!-- Reset Button -->
+            <button class="osrs-btn ctrl-btn ctrl-reset" id="reset-btn" onclick="resetAllPatches()">
+                <div class="ctrl-inner">
+                    <img class="uim-icon" src="https://oldschool.runescape.wiki/images/Watch.png" alt="Watch">
+                    RESET
+                    <img class="uim-icon" src="https://oldschool.runescape.wiki/images/Watch.png" alt="Watch">
+                </div>
+            </button>
+
+            <!-- Plant All Button -->
+            <button class="osrs-btn ctrl-btn ctrl-plant" id="plant-all-btn" onclick="plantAllPatches()">
+                <div class="ctrl-inner" id="plant-btn-inner">
+                    <img class="uim-icon" src="https://oldschool.runescape.wiki/images/Spade.png" alt="Spade">
+                    <span id="plant-text">PLANT ALL</span>
+                    <img class="uim-icon" src="https://oldschool.runescape.wiki/images/Spade.png" alt="Spade">
+                </div>
+            </button>
+        </div>
+
+    </div>
+
+    <!-- SCRIPT -->
+    <script>
+        const WINDOWS = [9, 29, 49];
+        const STAGE_MS = 20 * 60 * 1000;
+        const GROW_MS = 60 * 60 * 1000;
+        const HOLD_MS = 5000;      // hold the Next Tick card this long for test mode
+        const TEST_TIMER_MS = 10000; // test mode sets active timers to this
+
+        const herbs = [
+            { name: 'Ranarr', icon: 'https://oldschool.runescape.wiki/images/Grimy_ranarr_weed.png' },
+            { name: 'Toadflax', icon: 'https://oldschool.runescape.wiki/images/Grimy_toadflax.png' },
+            { name: 'Irit', icon: 'https://oldschool.runescape.wiki/images/Grimy_irit_leaf.png' },
+            { name: 'Avantoe', icon: 'https://oldschool.runescape.wiki/images/Grimy_avantoe.png' },
+            { name: 'Kwuarm', icon: 'https://oldschool.runescape.wiki/images/Grimy_kwuarm.png' },
+            { name: 'Snapdragon', icon: 'https://oldschool.runescape.wiki/images/Grimy_snapdragon.png' },
+            { name: 'Cadantine', icon: 'https://oldschool.runescape.wiki/images/Grimy_cadantine.png' },
+            { name: 'Dwarf Weed', icon: 'https://oldschool.runescape.wiki/images/Grimy_dwarf_weed.png' },
+            { name: 'Torstol', icon: 'https://oldschool.runescape.wiki/images/Grimy_torstol.png' }
+        ];
+
+        const patches = [
+            { id: 'ardougne', name: 'Ardougne', icon: 'https://oldschool.runescape.wiki/images/Ardougne_cloak_4.png' },
+            { id: 'varlamore', name: 'Varlamore', icon: 'https://oldschool.runescape.wiki/images/Perfected_quetzal_whistle.png' },
+            { id: 'ecto', name: 'Morytania', icon: 'https://oldschool.runescape.wiki/images/Ectophial.png' },
+            { id: 'catherby', name: 'Catherby', icon: 'https://oldschool.runescape.wiki/images/Catherby_Teleport_icon_%28mobile%29.png' },
+            { id: 'weiss', name: 'Weiss', icon: 'https://oldschool.runescape.wiki/images/Icy_basalt.png' },
+            { id: 'stronghold', name: 'Stronghold', icon: 'https://oldschool.runescape.wiki/images/Stony_basalt.png' },
+            { id: 'hosidius', name: 'Hosidius', icon: 'https://oldschool.runescape.wiki/images/Teleport_to_House_icon_%28mobile%29.png?a9d3d' },
+            { id: 'cabbage', name: 'Falador', icon: 'https://oldschool.runescape.wiki/images/Cabbage.png' },
+            { id: 'farming_guild', name: 'Guild', icon: 'https://oldschool.runescape.wiki/images/thumb/Seed_pack_detail.png/150px-Seed_pack_detail.png?2567b' },
+        ];
 
         // ---------- Android notifications (Capacitor) ----------
         // LN is undefined when opened in a normal browser, so the page still works there.
         const LN = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications;
 
+        const NOTIF_ICON = 'ic_stat_herb';   // status-bar icon (android-res/drawable-*/ic_stat_herb.png)
+        const NOTIF_COLOR = '#9a7208';
+        const RUNNING_ID = 1000;             // the "timers running" notification
+        let notificationsReady = false;
+        let lastRunningKey = null;
+
         async function setupNotifications() {
             if (!LN) return;
             try {
+                // Listen for the "Restart all" button on the finished notification
+                LN.addListener('localNotificationActionPerformed', async (event) => {
+                    if (event.actionId === 'restart') await restartFinishedTimers();
+                });
+
                 let perm = await LN.checkPermissions();
                 if (perm.display !== 'granted') perm = await LN.requestPermissions();
 
@@ -227,6 +409,21 @@
                     vibration: true
                 });
 
+                // Quiet channel for the always-on "timers running" icon
+                await LN.createChannel({
+                    id: 'herb-running',
+                    name: 'Timers running',
+                    description: 'Shows an icon while herb timers are growing',
+                    importance: 2,
+                    visibility: 1,
+                    vibration: false
+                });
+
+                // The button on the "ready to harvest" notification
+                await LN.registerActionTypes({
+                    types: [{ id: 'HERB_DONE', actions: [{ id: 'restart', title: 'Restart all' }] }]
+                });
+
                 // Ask once for "exact alarm" permission so alerts fire on time (Android 12+)
                 if (!localStorage.getItem('asked_exact_alarm')) {
                     const exact = await LN.checkExactNotificationSetting();
@@ -236,9 +433,41 @@
                     }
                 }
             } catch (e) { console.error('Notification setup failed', e); }
+            notificationsReady = true;
         }
 
-        // Re-schedules every notification from the saved timers.
+        // Shows an icon in the status bar while at least one timer is growing.
+        // Removed again when nothing is growing.
+        async function updateRunningNotification(force) {
+            if (!LN || !notificationsReady) return;
+            try {
+                const now = Date.now();
+                const running = patches
+                    .map(p => parseInt(localStorage.getItem(`finish_${p.id}`)))
+                    .filter(t => t && t > now);
+                const next = running.length ? Math.min(...running) : 0;
+                const key = running.length ? `${running.length}:${next}` : 'none';
+                if (!force && key === lastRunningKey) return;
+                lastRunningKey = key;
+
+                if (!running.length) {
+                    await LN.cancel({ notifications: [{ id: RUNNING_ID }] });
+                    return;
+                }
+                await LN.schedule({ notifications: [{
+                    id: RUNNING_ID,
+                    title: 'Herb timers running',
+                    body: `${running.length} growing · next ready ${formatClock(next)}`,
+                    channelId: 'herb-running',
+                    smallIcon: NOTIF_ICON,
+                    iconColor: NOTIF_COLOR,
+                    ongoing: true,
+                    autoCancel: false
+                }] });
+            } catch (e) { console.error('Running notification failed', e); }
+        }
+
+        // Re-schedules every "ready" notification from the saved timers.
         // Patches finishing at the same moment share one notification.
         async function syncNotifications() {
             if (!LN) return;
@@ -255,199 +484,246 @@
                     if (t && t > now) (groups[t] = groups[t] || []).push(p.name);
                 });
 
-                const notifications = Object.keys(groups).map((t, i) => ({
-                    id: i + 1,
-                    title: 'Herbs ready to harvest!',
-                    body: groups[t].length === patches.length ? 'All patches are ready' : groups[t].join(', '),
-                    channelId: 'herb-timers',
-                    schedule: { at: new Date(parseInt(t)), allowWhileIdle: true }
-                }));
+                const notifications = Object.keys(groups).map((t, i) => {
+                    const finishAt = parseInt(t);
+                    const names = groups[t].length === patches.length ? 'All patches' : groups[t].join(', ');
+                    // If restarted when this fires, they'll next be done at:
+                    const restartDone = formatClock(getFirstTick(new Date(finishAt)).getTime() + GROW_MS);
+                    return {
+                        id: i + 1,
+                        title: 'Herbs ready to harvest!',
+                        body: `${names} · restart to be done at ${restartDone}`,
+                        largeBody: `${names} ready to harvest.\nRestart now and they'll next be done at ${restartDone}.`,
+                        channelId: 'herb-timers',
+                        smallIcon: NOTIF_ICON,
+                        iconColor: NOTIF_COLOR,
+                        actionTypeId: 'HERB_DONE',
+                        schedule: { at: new Date(finishAt), allowWhileIdle: true }
+                    };
+                });
 
                 if (notifications.length) await LN.schedule({ notifications });
             } catch (e) { console.error('Scheduling failed', e); }
+            await updateRunningNotification(true);
         }
         // -------------------------------------------------------
 
-        function getFirstTick(now) { 
-            let m = now.getMinutes(); 
-            let target = WINDOWS.find(w => w > m) || WINDOWS[0]; 
-            let next = new Date(now); 
-            if (target <= m) next.setHours(next.getHours() + 1); 
-            next.setMinutes(target, 0, 0); 
-            return next; 
-        } 
+        function getFirstTick(now) {
+            let m = now.getMinutes();
+            let target = WINDOWS.find(w => w > m) || WINDOWS[0];
+            let next = new Date(now);
+            if (target <= m) next.setHours(next.getHours() + 1);
+            next.setMinutes(target, 0, 0);
+            return next;
+        }
 
-        function initData() { 
-            const grid = document.getElementById('patches-grid'); 
-             
-            patches.forEach((patch, index) => { 
-                const card = document.createElement('div'); 
-                card.className = 'patch-card'; 
+        function formatClock(ms) {
+            return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+        }
+
+        function initData() {
+            const grid = document.getElementById('patches-grid');
+            const tickCard = document.getElementById('tick-card');
+
+            patches.forEach((patch, index) => {
+                const card = document.createElement('div');
+                card.className = 'osrs-card';
                 card.onclick = () => togglePatch(patch.id);
-                card.innerHTML = ` 
-                    <div class="patch-name">${patch.name}</div> 
-                    <div class="timer-display-wrapper"> 
-                        <div class="timer-row"> 
-                            <img class="farming-icon" src="${patch.icon}"> 
-                            <div class="timer" id="timer-${patch.id}">Empty</div> 
-                            <img class="farming-icon" src="${herbs[index % herbs.length].icon}"> 
-                        </div> 
-                        <div class="cycle-text" id="cycle-${patch.id}"></div> 
-                    </div> 
-                    <button class="btn" id="btn-${patch.id}">Plant</button> 
-                `; 
-                grid.appendChild(card); 
-            }); 
+                card.innerHTML = `
+                    <div class="patch-name-text">${patch.name}</div>
+                    <div class="timer-row">
+                        <img class="farming-icon" src="${patch.icon}" alt="">
+                        <div class="timer" id="timer-${patch.id}">Empty</div>
+                        <img class="farming-icon" src="${herbs[index % herbs.length].icon}" alt="">
+                    </div>
+                    <div class="cycle-text" id="cycle-${patch.id}"></div>
+                    <button class="osrs-btn card-btn" id="btn-${patch.id}">Plant</button>
+                `;
+                grid.insertBefore(card, tickCard);
+            });
 
-            // Bottom Left: Reset Card
-            const resetCard = document.createElement('div');
-            resetCard.className = 'global-card';
-            resetCard.innerHTML = ` 
-                <div style="display: flex; align-items: center; justify-content: center; flex-grow: 1; padding: 4px 0;">
-                    <button class="btn-large reset" onclick="resetAllPatches()"> 
-                        <div class="btn-inner"> 
-                            <img class="uim-icon" src="https://oldschool.runescape.wiki/images/Watch.png" alt="Watch"> 
-                            RESET
-                            <img class="uim-icon" src="https://oldschool.runescape.wiki/images/Watch.png" alt="Watch"> 
-                        </div> 
-                    </button>
-                </div>
-            `;
-            grid.appendChild(resetCard);
+            setupTickCardGestures(tickCard);
 
-            // Bottom Middle: Global Countdown Card (Next Tick)
-            const globalCard = document.createElement('div');
-            globalCard.className = 'global-card';
-            globalCard.innerHTML = ` 
-                <div class="patch-name">Next Tick</div> 
-                <div class="timer-display-wrapper" style="margin: 2px 0;"> 
-                    <div class="timer-row"> 
-                        <img class="farming-icon" src="https://oldschool.runescape.wiki/images/Farming_icon.png" alt="Farming"> 
-                        <div class="timer" id="global-tick-timer" style="color: #55FF55;">--:--</div> 
-                        <img class="farming-icon" src="https://oldschool.runescape.wiki/images/Farming_icon.png" alt="Farming"> 
-                    </div> 
-                </div> 
-            `;
-            grid.appendChild(globalCard);
+            setInterval(updateAll, 1000);
+            updateAll();
+        }
 
-            // Bottom Right: Plant All Card
-            const plantAllCard = document.createElement('div');
-            plantAllCard.className = 'global-card';
-            plantAllCard.innerHTML = ` 
-                <div style="display: flex; align-items: center; justify-content: center; flex-grow: 1; padding: 4px 0;">
-                    <button class="btn-large plant" id="plant-all-btn" onclick="plantAllPatches()"> 
-                        <div class="btn-inner" id="plant-btn-inner"> 
-                            <img class="spade-icon" src="https://oldschool.runescape.wiki/images/Spade.png" alt="Spade"> 
-                            <span id="plant-text">READY</span> 
-                            <img class="secateurs-icon" src="https://oldschool.runescape.wiki/images/thumb/Secateurs_detail.png/100px-Secateurs_detail.png?c0359" alt="Secateurs"> 
-                        </div> 
-                    </button>
-                </div>
-            `;
-            grid.appendChild(plantAllCard);
+        // Tap = skip to next tick.  Hold for 5 seconds = test mode (active timers -> 10s).
+        function setupTickCardGestures(card) {
+            let holdTimer = null;
+            let holdFired = false;
 
-            setInterval(updateAll, 1000); 
-            updateAll(); 
-        } 
+            const cancelHold = () => {
+                clearTimeout(holdTimer);
+                holdTimer = null;
+                card.classList.remove('holding');
+            };
 
-        function togglePatch(id) {  
-            const finish = localStorage.getItem(`finish_${id}`); 
-            const timerEl = document.getElementById(`timer-${id}`);
-            if (finish) { 
-                localStorage.removeItem(`finish_${id}`); 
-            } else {  
-                const firstTick = getFirstTick(new Date()); 
-                localStorage.setItem(`finish_${id}`, (firstTick.getTime() + (60 * 60 * 1000)).toString()); 
-            }  
-            updateAll();  
+            card.addEventListener('pointerdown', (e) => {
+                if (e.pointerType === 'mouse' && e.button !== 0) return;
+                holdFired = false;
+                card.classList.add('holding');
+                holdTimer = setTimeout(() => {
+                    holdFired = true;
+                    card.classList.remove('holding');
+                    holdTimer = null;
+                    setActiveTimersTo(TEST_TIMER_MS);
+                }, HOLD_MS);
+            });
+
+            card.addEventListener('pointerup', () => {
+                const wasHolding = holdTimer !== null;
+                cancelHold();
+                if (wasHolding && !holdFired) skipToNextTick();   // released before 5s = normal tap
+            });
+
+            card.addEventListener('pointerleave', cancelHold);
+            card.addEventListener('pointercancel', cancelHold);
+            card.addEventListener('contextmenu', (e) => e.preventDefault());
+        }
+
+        function togglePatch(id) {
+            const finish = localStorage.getItem(`finish_${id}`);
+            if (finish) {
+                localStorage.removeItem(`finish_${id}`);
+            } else {
+                const firstTick = getFirstTick(new Date());
+                localStorage.setItem(`finish_${id}`, (firstTick.getTime() + GROW_MS).toString());
+            }
+            updateAll();
             syncNotifications();
-        } 
-         
-        function plantAllPatches() {  
-            const firstTick = getFirstTick(new Date()); 
-            const finishTime = firstTick.getTime() + (60 * 60 * 1000); 
-             
-            patches.forEach(p => {  
-                if (!localStorage.getItem(`finish_${p.id}`)) { 
-                    localStorage.setItem(`finish_${p.id}`, finishTime.toString()); 
-                } 
-            });  
-            updateAll();  
+        }
+
+        function plantAllPatches() {
+            const firstTick = getFirstTick(new Date());
+            const finishTime = firstTick.getTime() + GROW_MS;
+            patches.forEach(p => {
+                if (!localStorage.getItem(`finish_${p.id}`)) {
+                    localStorage.setItem(`finish_${p.id}`, finishTime.toString());
+                }
+            });
+            updateAll();
             syncNotifications();
-        } 
+        }
 
-        function resetAllPatches() { patches.forEach(p => localStorage.removeItem(`finish_${p.id}`)); updateAll(); syncNotifications(); } 
-         
-        function updateAll() {  
-            const now = Date.now(); 
-            patches.forEach(patch => {  
-                const finishTime = parseInt(localStorage.getItem(`finish_${patch.id}`));  
-                const timerEl = document.getElementById(`timer-${patch.id}`);  
-                const cycleEl = document.getElementById(`cycle-${patch.id}`);  
-                const btnEl = document.getElementById(`btn-${patch.id}`);  
+        function resetAllPatches() {
+            patches.forEach(p => localStorage.removeItem(`finish_${p.id}`));
+            updateAll();
+            syncNotifications();
+        }
 
-                if (!finishTime) {  
-                    timerEl.innerText = "Empty"; 
-                    timerEl.style.color = "#FF5555"; 
-                    btnEl.innerText = "Plant"; 
-                    btnEl.classList.remove('ready-flash'); 
-                    return;  
-                }  
+        // "Restart all" button on the notification: replants every patch that is ready to harvest.
+        async function restartFinishedTimers() {
+            const now = Date.now();
+            const newFinish = getFirstTick(new Date(now)).getTime() + GROW_MS;
+            patches.forEach(p => {
+                const finish = parseInt(localStorage.getItem(`finish_${p.id}`));
+                if (finish && finish <= now) localStorage.setItem(`finish_${p.id}`, newFinish.toString());
+            });
+            if (LN) { try { await LN.removeAllDeliveredNotifications(); } catch (e) {} }
+            updateAll();
+            await syncNotifications();
+        }
 
-                if (now >= finishTime) {  
-                    timerEl.innerText = "Harvest"; 
-                    timerEl.style.color = "#FF5555";  
-                    cycleEl.innerText = "Stage 4/4"; 
-                    btnEl.innerText = "Clear";  
-                    btnEl.classList.add('ready-flash'); 
-                } else {  
-                    const remainingMs = finishTime - now; 
-                    const mins = Math.floor(remainingMs / 60000); 
-                    const secs = Math.floor((remainingMs % 60000) / 1000); 
-                    const timeElapsedFromFirstTick = now - (finishTime - 60 * 60 * 1000); 
+        // Takes exactly 20 minutes (one stage) off every growing timer.
+        function skipToNextTick() {
+            const now = Date.now();
+            patches.forEach(p => {
+                const finish = parseInt(localStorage.getItem(`finish_${p.id}`));
+                if (!finish || finish <= now) return;            // empty or already ready
+                localStorage.setItem(`finish_${p.id}`, (finish - STAGE_MS).toString());
+            });
+            updateAll();
+            syncNotifications();
+        }
 
-                    let stage = timeElapsedFromFirstTick < 0 ? 0 : Math.floor(timeElapsedFromFirstTick / (20 * 60 * 1000)) + 1; 
-                     
-                    timerEl.innerText = `${mins}m ${secs}s`; 
-                    timerEl.style.color = "#55FF55"; 
-                    cycleEl.innerText = `Stage ${stage}/4`;  
-                    btnEl.innerText = new Date(finishTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false}); 
-                    btnEl.classList.remove('ready-flash'); 
-                }  
-            });  
+        // Test mode: every growing patch will be ready in `ms` milliseconds.
+        function setActiveTimersTo(ms) {
+            const now = Date.now();
+            patches.forEach(p => {
+                const finish = parseInt(localStorage.getItem(`finish_${p.id}`));
+                if (finish && finish > now) {
+                    localStorage.setItem(`finish_${p.id}`, (now + ms).toString());
+                }
+            });
+            updateAll();
+            syncNotifications();
+        }
 
-            // Update global next tick timer
+        function updateAll() {
+            const now = Date.now();
+            patches.forEach(patch => {
+                const finishTime = parseInt(localStorage.getItem(`finish_${patch.id}`));
+                const timerEl = document.getElementById(`timer-${patch.id}`);
+                const cycleEl = document.getElementById(`cycle-${patch.id}`);
+                const btnEl = document.getElementById(`btn-${patch.id}`);
+
+                if (!finishTime) {
+                    timerEl.innerText = "Empty";
+                    timerEl.style.color = "var(--osrs-red-text)";
+                    cycleEl.innerText = "";
+                    btnEl.innerText = "Plant";
+                    btnEl.className = "osrs-btn card-btn";
+                    return;
+                }
+
+                if (now >= finishTime) {
+                    timerEl.innerText = "Harvest";
+                    timerEl.style.color = "var(--osrs-red-text)";
+                    cycleEl.innerText = "Stage 4/4";
+                    btnEl.innerText = "Clear";
+                    btnEl.className = "osrs-btn card-btn ready-flash";
+                } else {
+                    const remainingMs = finishTime - now;
+                    const mins = Math.floor(remainingMs / 60000);
+                    const secs = Math.floor((remainingMs % 60000) / 1000);
+                    const timeElapsed = now - (finishTime - GROW_MS);
+                    let stage = timeElapsed < 0 ? 0 : Math.floor(timeElapsed / STAGE_MS) + 1;
+
+                    timerEl.innerText = `${mins}m ${secs}s`;
+                    timerEl.style.color = "var(--osrs-green-text)";
+                    cycleEl.innerText = `Stage ${stage}/4`;
+                    btnEl.innerText = formatClock(finishTime);
+                    btnEl.className = "osrs-btn card-btn";
+                }
+            });
+
+            // Global Tick Timer
             const nextTick = getFirstTick(new Date(now));
             const remainingTickMs = nextTick.getTime() - now;
             const tickMins = Math.floor(remainingTickMs / 60000);
             const tickSecs = Math.floor((remainingTickMs % 60000) / 1000);
-             
             const tickTimerEl = document.getElementById('global-tick-timer');
             if (tickTimerEl) {
                 tickTimerEl.innerText = `${tickMins}m ${tickSecs < 10 ? '0' : ''}${tickSecs}s`;
-                tickTimerEl.style.color = "#55FF55";
             }
-             
-            const plantText = document.getElementById('plant-text'); 
-            const plantAllBtn = document.getElementById('plant-all-btn');  
-            const activePatches = patches.filter(p => localStorage.getItem(`finish_${p.id}`));  
-             
-            if (activePatches.length === 0) { 
-                plantText.innerText = "READY"; 
-                plantAllBtn.style.color = "#55FF55";
-                plantAllBtn.classList.remove('flash-alert'); 
-            } else if (activePatches.every(p => Date.now() >= parseInt(localStorage.getItem(`finish_${p.id}`)))) {  
-                plantText.innerText = "HARVEST"; 
-                plantAllBtn.style.color = "";
-                plantAllBtn.classList.add('flash-alert');  
-            } else { 
-                plantText.innerText = "GROWING"; 
-                plantAllBtn.style.color = "#55FF55";
-                plantAllBtn.classList.remove('flash-alert'); 
-            }  
-        } 
+            const tickTimeEl = document.getElementById('global-tick-time');
+            if (tickTimeEl) tickTimeEl.innerText = formatClock(nextTick.getTime());
 
-        window.onload = async () => { initData(); await setupNotifications(); syncNotifications(); }; 
-    </script> 
-</body> 
+            updateRunningNotification();
+
+            // Plant All button status
+            const plantText = document.getElementById('plant-text');
+            const plantAllBtn = document.getElementById('plant-all-btn');
+            const activePatches = patches.filter(p => localStorage.getItem(`finish_${p.id}`));
+
+            if (activePatches.length === 0) {
+                plantText.innerText = "PLANT ALL";
+                plantAllBtn.classList.remove('flash-alert');
+            } else if (activePatches.every(p => Date.now() >= parseInt(localStorage.getItem(`finish_${p.id}`)))) {
+                plantText.innerText = "HARVEST";
+                plantAllBtn.classList.add('flash-alert');
+            } else {
+                plantText.innerText = "GROWING";
+                plantAllBtn.classList.remove('flash-alert');
+            }
+        }
+
+        window.onload = async () => {
+            initData();
+            await setupNotifications();
+            syncNotifications();
+        };
+    </script>
+</body>
 </html>
