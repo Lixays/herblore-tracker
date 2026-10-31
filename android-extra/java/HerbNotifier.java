@@ -36,6 +36,9 @@ final class HerbNotifier {
     static final int RUNNING_ID = 1000;
     static final int MAX_GROUPS = 12;
     static final long GROW_MS = 60L * 60L * 1000L;
+    static final long SNOOZE_MS = 10L * 60L * 1000L;
+    static final int SNOOZE_NOTIF_ID = 20;
+    static final int SNOOZE_ALARM_CODE = 200;
 
     static final String EXTRA_AT = "at";
     static final String EXTRA_NAMES = "names";
@@ -102,7 +105,7 @@ final class HerbNotifier {
         }
     }
 
-    private static PendingIntent openAppIntent(Context ctx) {
+    static PendingIntent openAppIntent(Context ctx) {
         Intent intent = ctx.getPackageManager().getLaunchIntentForPackage(ctx.getPackageName());
         if (intent == null) intent = new Intent(ctx, MainActivity.class);
         return PendingIntent.getActivity(ctx, 2, intent,
@@ -215,6 +218,11 @@ final class HerbNotifier {
         PendingIntent replantPending = PendingIntent.getBroadcast(ctx, 50, replant,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
+        Intent snoozeIntent = new Intent(ctx, SnoozeReceiver.class);
+        snoozeIntent.setAction(SnoozeReceiver.ACTION);
+        PendingIntent snoozePending = PendingIntent.getBroadcast(ctx, 60, snoozeIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
         NotificationCompat.Builder builder = new NotificationCompat.Builder(ctx, CH_READY)
                 .setSmallIcon(R.drawable.ic_stat_herb)
                 .setContentTitle("Herbs ready to harvest!")
@@ -224,8 +232,59 @@ final class HerbNotifier {
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true)
                 .setContentIntent(openAppIntent(ctx))
-                .addAction(0, "Restart all", replantPending);
+                .addAction(0, "Restart all", replantPending)
+                .addAction(0, "Snooze 10 min", snoozePending);
         notifySafely(ctx, id, builder.build());
+    }
+
+    /** Names of the patches that are finished right now, or null if none are. */
+    static String readyNames(Context ctx) {
+        long now = System.currentTimeMillis();
+        JSONArray timers = HerbStore.timers(ctx);
+        ArrayList<String> names = new ArrayList<>();
+        try {
+            for (int i = 0; i < timers.length(); i++) {
+                JSONObject t = timers.getJSONObject(i);
+                long finish = t.optLong("finish", 0);
+                if (finish > 0 && finish <= now) names.add(t.optString("name", "Patch"));
+            }
+        } catch (Exception ignored) { }
+        if (names.isEmpty()) return null;
+        if (names.size() == timers.length()) return "All patches";
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < names.size(); i++) {
+            if (i > 0) sb.append(", ");
+            sb.append(names.get(i));
+        }
+        return sb.toString();
+    }
+
+    private static PendingIntent snoozeAlarmIntent(Context ctx) {
+        Intent intent = new Intent(ctx, ReadyReceiver.class);
+        intent.setAction("com.example.herbloretracker.SNOOZED");
+        intent.putExtra("snoozed", true);
+        return PendingIntent.getBroadcast(ctx, SNOOZE_ALARM_CODE, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    /** Hides the "ready" notifications and brings them back in 10 minutes. */
+    static void snooze(Context ctx) {
+        NotificationManagerCompat nm = NotificationManagerCompat.from(ctx);
+        for (int i = 1; i <= MAX_GROUPS; i++) nm.cancel(i);
+        nm.cancel(SNOOZE_NOTIF_ID);
+
+        AlarmManager alarms = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
+        if (alarms == null) return;
+        PendingIntent pending = snoozeAlarmIntent(ctx);
+        alarms.cancel(pending);
+        setAlarm(alarms, System.currentTimeMillis() + SNOOZE_MS, pending);
+    }
+
+    /** Forget any snoozed reminder (used when the timers are replanted). */
+    static void cancelSnooze(Context ctx) {
+        AlarmManager alarms = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
+        if (alarms != null) alarms.cancel(snoozeAlarmIntent(ctx));
+        NotificationManagerCompat.from(ctx).cancel(SNOOZE_NOTIF_ID);
     }
 
     /**
@@ -307,6 +366,7 @@ final class HerbNotifier {
         // Clear the "ready" notifications that were showing
         NotificationManagerCompat nm = NotificationManagerCompat.from(ctx);
         for (int i = 1; i <= MAX_GROUPS; i++) nm.cancel(i);
+        cancelSnooze(ctx);
 
         scheduleAll(ctx);
         HerbWidgetProvider.updateAll(ctx);

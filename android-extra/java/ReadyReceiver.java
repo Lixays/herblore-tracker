@@ -8,6 +8,19 @@ import android.content.Intent;
 public class ReadyReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
+        if (intent.getBooleanExtra("snoozed", false)) {
+            // Snoozed reminder: only show it if some patches are still waiting to be harvested
+            try {
+                String ready = HerbNotifier.readyNames(context);
+                if (ready != null) {
+                    HerbNotifier.showReady(context, HerbNotifier.SNOOZE_NOTIF_ID, System.currentTimeMillis(), ready);
+                }
+            } catch (Throwable t) {
+                HerbStore.logError(context, "snooze reminder", t);
+            }
+            return;
+        }
+
         int id = intent.getIntExtra(HerbNotifier.EXTRA_ID, 1);
         long at = intent.getLongExtra(HerbNotifier.EXTRA_AT, System.currentTimeMillis());
         String names = intent.getStringExtra(HerbNotifier.EXTRA_NAMES);

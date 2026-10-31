@@ -40,6 +40,11 @@ public class HerbWidgetProvider extends AppWidgetProvider {
     }
 
     public static void updateAll(Context context) {
+        try {
+            HerbMiniWidgetProvider.updateAll(context);      // the 1x1 widget
+        } catch (Throwable t) {
+            HerbStore.logError(context, "mini widget", t);
+        }
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
         ComponentName component = new ComponentName(context, HerbWidgetProvider.class);
         int[] ids = manager.getAppWidgetIds(component);

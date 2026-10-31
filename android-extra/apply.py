@@ -30,6 +30,11 @@ required = [
     "android-extra/java/ReadyReceiver.java",
     "android-extra/java/ReplantReceiver.java",
     "android-extra/java/BootReceiver.java",
+    "android-extra/java/SnoozeReceiver.java",
+    "android-extra/java/HerbMiniWidgetProvider.java",
+    "android-extra/offline_assets.py",
+    "android-extra/res/layout/herb_widget_mini.xml",
+    "android-extra/res/xml/herb_widget_mini_info.xml",
     "android-extra/res/layout/herb_widget.xml",
     "android-extra/res/xml/herb_widget_info.xml",
     "android-extra/res/drawable/widget_bg.xml",
@@ -67,7 +72,7 @@ permissions = (
     '    '
 )
 receivers = (
-    '    <receiver android:name=".HerbWidgetProvider" android:exported="true">\n'
+    '    <receiver android:name=".HerbWidgetProvider" android:exported="true" android:label="Herb Timer - next ready">\n'
     '            <intent-filter>\n'
     '                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>\n'
     '            </intent-filter>\n'
@@ -75,6 +80,13 @@ receivers = (
     '        </receiver>\n'
     '        <receiver android:name=".ReadyReceiver" android:exported="false"/>\n'
     '        <receiver android:name=".ReplantReceiver" android:exported="false"/>\n'
+    '        <receiver android:name=".SnoozeReceiver" android:exported="false"/>\n'
+    '        <receiver android:name=".HerbMiniWidgetProvider" android:exported="true" android:label="Herb Timer - all done (1x1)">\n'
+    '            <intent-filter>\n'
+    '                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>\n'
+    '            </intent-filter>\n'
+    '            <meta-data android:name="android.appwidget.provider" android:resource="@xml/herb_widget_mini_info"/>\n'
+    '        </receiver>\n'
     '        <receiver android:name=".BootReceiver" android:exported="true">\n'
     '            <intent-filter>\n'
     '                <action android:name="android.intent.action.BOOT_COMPLETED"/>\n'
@@ -87,9 +99,17 @@ if "POST_NOTIFICATIONS" not in manifest:
     manifest = manifest.replace("<application", permissions + "<application", 1)
 if "HerbWidgetProvider" not in manifest:
     manifest = manifest.replace("</application>", receivers + "</application>", 1)
-for needed in ("POST_NOTIFICATIONS", "USE_EXACT_ALARM", "RECEIVE_BOOT_COMPLETED", "HerbWidgetProvider", "ReadyReceiver", "ReplantReceiver", "BootReceiver"):
+for needed in ("POST_NOTIFICATIONS", "USE_EXACT_ALARM", "RECEIVE_BOOT_COMPLETED", "HerbWidgetProvider", "ReadyReceiver", "ReplantReceiver", "SnoozeReceiver", "HerbMiniWidgetProvider", "BootReceiver"):
     if needed not in manifest:
         fail("could not patch AndroidManifest.xml (" + needed + ")")
 open(manifest_path, "w", encoding="utf-8").write(manifest)
 
 print("Icons, widget, notifications and permissions applied for", pkg)
+
+# 5. make the app work offline: bundle the wiki images and fonts into the app
+try:
+    sys.path.insert(0, "android-extra")
+    import offline_assets
+    offline_assets.main()
+except Exception as error:   # never stop the build because of this
+    print("WARNING: offline assets step failed:", error)

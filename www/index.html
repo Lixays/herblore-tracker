@@ -523,6 +523,8 @@
 
         const NOTIF_ICON = 'ic_stat_herb';   // white leaf for the status bar (android-res/drawable-*/ic_stat_herb.png)
         const STATUS_ID = 1000;
+        const SNOOZE_ID = 20;
+        const SNOOZE_MS = 10 * 60 * 1000;
         let nativeWorking = !!HW;
         let pluginReady = false;
 
@@ -566,9 +568,10 @@
             if (pluginReady || !LN) return;
             await LN.createChannel({ id: 'herb-timers', name: 'Herb timers', description: 'Alerts when herb patches are ready', importance: 5, visibility: 1, vibration: true });
             await LN.createChannel({ id: 'herb-status', name: 'Timer status icon', description: 'Shows an icon while herb timers are growing or ready', importance: 3, visibility: 1, vibration: false });
-            await LN.registerActionTypes({ types: [{ id: 'HERB_DONE', actions: [{ id: 'restart', title: 'Restart all' }] }] });
+            await LN.registerActionTypes({ types: [{ id: 'HERB_DONE', actions: [{ id: 'restart', title: 'Restart all' }, { id: 'snooze', title: 'Snooze 10 min' }] }] });
             LN.addListener('localNotificationActionPerformed', async (event) => {
                 if (event.actionId === 'restart') await restartFinishedTimers();
+                if (event.actionId === 'snooze') await snoozeWithPlugin();
             });
             pluginReady = true;
         }
@@ -585,8 +588,9 @@
             try {
                 await setupPluginNotifications();
                 const pending = await LN.getPending();
-                if (pending.notifications.length) {
-                    await LN.cancel({ notifications: pending.notifications.map(n => ({ id: n.id })) });
+                const stale = pending.notifications.filter(n => n.id !== SNOOZE_ID);   // keep a snoozed reminder
+                if (stale.length) {
+                    await LN.cancel({ notifications: stale.map(n => ({ id: n.id })) });
                 }
 
                 const now = Date.now();
@@ -638,6 +642,29 @@
                     await LN.cancel({ notifications: [{ id: STATUS_ID }] });
                 }
             } catch (e) { console.error('Plugin scheduling failed', e); }
+        }
+
+        // Snooze button used by the safety-net notification: brings the reminder back in 10 minutes.
+        async function snoozeWithPlugin() {
+            if (!LN) return;
+            try {
+                try { await LN.removeAllDeliveredNotifications(); } catch (e) {}
+                const now = Date.now();
+                const ready = patches.filter(p => { const t = parseInt(localStorage.getItem(`finish_${p.id}`)); return t && t <= now; }).map(p => p.name);
+                if (!ready.length) return;
+                const names = ready.length === patches.length ? 'All patches' : ready.join(', ');
+                const at = new Date(now + SNOOZE_MS);
+                const restartDone = formatClock(getFirstTick(at).getTime() + GROW_MS);
+                await LN.schedule({ notifications: [{
+                    id: SNOOZE_ID,
+                    title: 'Herbs ready to harvest!',
+                    body: `${names} · restart to be done at ${restartDone}`,
+                    channelId: 'herb-timers',
+                    smallIcon: NOTIF_ICON,
+                    actionTypeId: 'HERB_DONE',
+                    schedule: { at, allowWhileIdle: true }
+                }] });
+            } catch (e) { console.error('Snooze failed', e); }
         }
 
         // Restart button used by the safety-net notification: replants everything that is ready.
