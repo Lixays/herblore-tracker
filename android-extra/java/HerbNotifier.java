@@ -130,10 +130,14 @@ final class HerbNotifier {
     static void scheduleAll(Context ctx) {
         try {
             scheduleAlarms(ctx);
-        } catch (Exception ignored) { }
+        } catch (Throwable t) {
+            HerbStore.logError(ctx, "alarms", t);
+        }
         try {
             updateRunning(ctx);
-        } catch (Exception ignored) { }
+        } catch (Throwable t) {
+            HerbStore.logError(ctx, "status icon", t);
+        }
     }
 
     private static void scheduleAlarms(Context ctx) {
@@ -188,6 +192,14 @@ final class HerbNotifier {
             setAlarm(alarms, entry.getKey(), pending);
             id++;
         }
+        HerbStore.setAlarmCount(ctx, id - 1);
+    }
+
+    /** True when alarms will fire exactly on time. */
+    static boolean canExact(Context ctx) {
+        if (Build.VERSION.SDK_INT < 31) return true;
+        AlarmManager alarms = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
+        return alarms != null && alarms.canScheduleExactAlarms();
     }
 
     // ---------- notifications ----------

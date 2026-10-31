@@ -362,6 +362,18 @@
             font-size: 12px;
             color: var(--osrs-red-text);
         }
+        .status-box {
+            margin-top: 6px;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 10.5px;
+            line-height: 1.5;
+            color: #6f6450;
+            text-align: left;
+            white-space: pre-wrap;
+            word-break: break-word;
+            user-select: text;
+            -webkit-user-select: text;
+        }
         .modal-actions { display: flex; gap: 10px; margin-top: 10px; }
         .modal-btn { flex: 1; padding: 10px 0; font-size: 14px; letter-spacing: 0; }
         .modal-save { color: var(--osrs-gold-text); }
@@ -436,6 +448,7 @@
                 <label>Tick 3<input id="tick-in-2" type="number" inputmode="numeric" min="0" max="59" onchange="onTickInputChange(2)"></label>
             </div>
             <div class="modal-error" id="tick-error"></div>
+            <div class="status-box" id="native-status"></div>
             <div class="modal-actions">
                 <button class="osrs-btn modal-btn" id="tick-cancel" onclick="closeTickSettings()">Cancel</button>
                 <button class="osrs-btn modal-btn modal-save" onclick="saveTickSettings()">Save</button>
@@ -445,6 +458,7 @@
 
     <!-- ABOUT -->
     <div class="modal-overlay" id="about-modal" hidden onclick="if (event.target === this) closeAbout()">
+        <div class="modal-card osrs-panel">
         <div class="modal-card osrs-panel">
 <p class="modal-text about-text">Heyo! I use a similar timer on PC on a side display for tracking different herb patches. Using AI I've transfered that into an app with some other features for a QOL mobile timer. If you've set your farming tick up wrong you can fix that in the settings. Make sure you give notification/timer permissions for this to work. You can reset all timers from the notification so you don't have to tab out of Scape. Do what you want with this app. Just don't sell it. Selling AI stuff is fucking stupid. Cheers, Rikku.</p>
             <div class="modal-actions">
@@ -496,10 +510,11 @@
             { id: 'farming_guild', name: 'Guild', icon: 'https://oldschool.runescape.wiki/images/thumb/Seed_pack_detail.png/150px-Seed_pack_detail.png?2567b' },
         ];
 
-        // ---------- Notifications & widget (handled by the Android side) ----------
-        // The app hands its timers to the Android side. That is what shows the "ready" notifications,
-        // the status-bar icon and the home-screen widget, and what lets their buttons replant
-        // without opening the app. These are undefined in a normal browser, so the page still works there.
+        // ---------- Notifications & widget ----------
+        // Main path: the app hands its timers to the Android side, which shows the "ready" notifications,
+        // the status-bar icon and the home-screen widget, and lets their buttons replant without opening the app.
+        // Safety net: if the Android side can't be reached, the notification plugin does the job instead
+        // (same alerts, but its Restart button opens the app).
         function getPlugin(name) {
             const cap = window.Capacitor;
             if (!cap) return undefined;                       // normal browser
@@ -509,7 +524,12 @@
         const LN = getPlugin('LocalNotifications');
         const HW = getPlugin('HerbWidget');
 
-        // Only asks for permission; the notifications themselves come from the Android side.
+        const NOTIF_ICON = 'ic_stat_herb';   // white leaf for the status bar (android-res/drawable-*/ic_stat_herb.png)
+        const STATUS_ID = 1000;
+        let nativeWorking = !!HW;
+        let pluginReady = false;
+
+        // Asks for permission to show notifications.
         async function setupNotifications() {
             if (!LN) return;
             try {
@@ -527,30 +547,125 @@
             } catch (e) { console.error('Notification setup failed', e); }
         }
 
-        // Sends the current timers + farming tick to the Android side.
-        function pushWidgetData() {
-            if (!HW) return;
+        // Sends the current timers + farming tick to the Android side. Returns true if it accepted them.
+        async function pushWidgetData() {
+            if (!HW) return false;
             try {
                 const timers = patches.map(p => ({
                     id: p.id,
                     name: p.name,
                     finish: parseInt(localStorage.getItem(`finish_${p.id}`)) || 0
                 }));
-                Promise.resolve(HW.update({
-                    timers: JSON.stringify(timers),
-                    windows: JSON.stringify(WINDOWS)
-                })).catch(() => {});
-            } catch (e) { console.error('Update failed', e); }
+                await HW.update({ timers: JSON.stringify(timers), windows: JSON.stringify(WINDOWS) });
+                return true;
+            } catch (e) {
+                console.error('Android side did not accept the timers', e);
+                return false;
+            }
+        }
+
+        // ----- safety net: notifications scheduled by the plugin -----
+        async function setupPluginNotifications() {
+            if (pluginReady || !LN) return;
+            await LN.createChannel({ id: 'herb-timers', name: 'Herb timers', description: 'Alerts when herb patches are ready', importance: 5, visibility: 1, vibration: true });
+            await LN.createChannel({ id: 'herb-status', name: 'Timer status icon', description: 'Shows an icon while herb timers are growing or ready', importance: 3, visibility: 1, vibration: false });
+            await LN.registerActionTypes({ types: [{ id: 'HERB_DONE', actions: [{ id: 'restart', title: 'Restart all' }] }] });
+            LN.addListener('localNotificationActionPerformed', async (event) => {
+                if (event.actionId === 'restart') await restartFinishedTimers();
+            });
+            pluginReady = true;
+        }
+
+        // Runs one after another, so two quick changes can't overlap.
+        let pluginQueue = Promise.resolve();
+        function scheduleWithPlugin() {
+            pluginQueue = pluginQueue.then(scheduleWithPluginNow).catch(() => {});
+            return pluginQueue;
+        }
+
+        async function scheduleWithPluginNow() {
+            if (!LN) return;
+            try {
+                await setupPluginNotifications();
+                const pending = await LN.getPending();
+                if (pending.notifications.length) {
+                    await LN.cancel({ notifications: pending.notifications.map(n => ({ id: n.id })) });
+                }
+
+                const now = Date.now();
+                const groups = {};
+                let running = 0, ready = 0, next = 0;
+                patches.forEach(p => {
+                    const t = parseInt(localStorage.getItem(`finish_${p.id}`));
+                    if (!t) return;
+                    if (t > now) {
+                        (groups[t] = groups[t] || []).push(p.name);
+                        running++;
+                        if (!next || t < next) next = t;
+                    } else {
+                        ready++;
+                    }
+                });
+
+                const notifications = Object.keys(groups).map((t, i) => {
+                    const finishAt = parseInt(t);
+                    const names = groups[t].length === patches.length ? 'All patches' : groups[t].join(', ');
+                    const restartDone = formatClock(getFirstTick(new Date(finishAt)).getTime() + GROW_MS);
+                    return {
+                        id: i + 1,
+                        title: 'Herbs ready to harvest!',
+                        body: `${names} · restart to be done at ${restartDone}`,
+                        largeBody: `${names} ready to harvest.\nRestart now and they'll next be done at ${restartDone}.`,
+                        channelId: 'herb-timers',
+                        smallIcon: NOTIF_ICON,
+                        actionTypeId: 'HERB_DONE',
+                        schedule: { at: new Date(finishAt), allowWhileIdle: true }
+                    };
+                });
+                if (notifications.length) await LN.schedule({ notifications });
+
+                // Status-bar icon: while anything is growing or waiting to be harvested
+                if (running || ready) {
+                    await LN.schedule({ notifications: [{
+                        id: STATUS_ID,
+                        title: running ? 'Herb timers running' : 'Herbs ready to harvest!',
+                        body: running
+                            ? `${running} growing · next ready ${formatClock(next)}${ready ? ` · ${ready} ready` : ''}`
+                            : `${ready} ${ready === 1 ? 'patch is' : 'patches are'} ready`,
+                        channelId: 'herb-status',
+                        smallIcon: NOTIF_ICON,
+                        ongoing: true,
+                        autoCancel: false
+                    }] });
+                } else {
+                    await LN.cancel({ notifications: [{ id: STATUS_ID }] });
+                }
+            } catch (e) { console.error('Plugin scheduling failed', e); }
+        }
+
+        // Restart button used by the safety-net notification: replants everything that is ready.
+        async function restartFinishedTimers() {
+            const now = Date.now();
+            const newFinish = getFirstTick(new Date(now)).getTime() + GROW_MS;
+            patches.forEach(p => {
+                const finish = parseInt(localStorage.getItem(`finish_${p.id}`));
+                if (finish && finish <= now) localStorage.setItem(`finish_${p.id}`, newFinish.toString());
+            });
+            if (LN) { try { await LN.removeAllDeliveredNotifications(); } catch (e) {} }
+            updateAll();
+            await syncNotifications();
         }
 
         // Called after any change to the timers.
         async function syncNotifications() {
-            pushWidgetData();
+            if (nativeWorking && await pushWidgetData()) return;
+            nativeWorking = false;                    // couldn't reach the Android side: use the plugin instead
+            await scheduleWithPlugin();
         }
 
         // Picks up changes made by the notification / widget replant buttons while the app wasn't looking.
         async function pullNativeState() {
-            if (!HW) return;
+            if (!HW || !nativeWorking) return;
             try {
                 const state = await HW.getState();
                 if (state && state.dirty) {
@@ -562,6 +677,28 @@
                     updateAll();
                 }
             } catch (e) { console.error('Could not read native state', e); }
+        }
+
+        // Fills the small status box on the settings screen so problems are easy to spot.
+        async function refreshNativeStatus() {
+            const box = document.getElementById('native-status');
+            if (!box) return;
+            if (!window.Capacitor) { box.innerText = 'Running in a browser: phone notifications are not available here.'; return; }
+            if (!HW) { box.innerText = 'Android link: not found (using backup notifications)'; return; }
+            try {
+                const st = await HW.getStatus();
+                const lines = [
+                    'Android link: OK' + (nativeWorking ? '' : ' (not accepting timers, using backup)'),
+                    'Notifications: ' + (st.notificationsEnabled ? 'ON' : 'OFF - allow them in phone Settings > Apps > Herb Timer > Notifications'),
+                    'Exact alarms: ' + (st.exactAlarms ? 'ON' : 'OFF - allow "Alarms & reminders" for this app'),
+                    'Alerts scheduled: ' + st.alarms
+                ];
+                if (st.lastFired) lines.push('Last alert fired: ' + new Date(st.lastFired).toLocaleTimeString());
+                if (st.lastError) lines.push('Last error: ' + st.lastError);
+                box.innerText = lines.join('\n');
+            } catch (e) {
+                box.innerText = 'Android link: found but not responding (' + e + ')';
+            }
         }
 
         // ---------- Farming tick settings ----------
@@ -595,6 +732,7 @@
             document.getElementById('tick-error').innerText = '';
             document.getElementById('tick-cancel').style.display = firstRun ? 'none' : '';
             document.getElementById('tick-modal').hidden = false;
+            refreshNativeStatus();
         }
 
         function openAbout() { document.getElementById('about-modal').hidden = false; }

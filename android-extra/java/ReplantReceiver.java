@@ -10,6 +10,10 @@ public class ReplantReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        HerbNotifier.replant(context);
+        try {
+            HerbNotifier.replant(context);
+        } catch (Throwable t) {
+            HerbStore.logError(context, "replant", t);
+        }
     }
 }

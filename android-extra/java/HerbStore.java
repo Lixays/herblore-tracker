@@ -45,6 +45,31 @@ final class HerbStore {
         prefs(c).edit().putBoolean("dirty", dirty).apply();
     }
 
+    // ---- diagnostics (shown in the app's settings screen) ----
+    static void logError(Context c, String where, Throwable t) {
+        prefs(c).edit().putString("last_error", where + ": " + t).apply();
+    }
+
+    static String lastError(Context c) {
+        return prefs(c).getString("last_error", "");
+    }
+
+    static void setAlarmCount(Context c, int n) {
+        prefs(c).edit().putInt("alarm_count", n).apply();
+    }
+
+    static int alarmCount(Context c) {
+        return prefs(c).getInt("alarm_count", 0);
+    }
+
+    static void setLastFired(Context c, long t) {
+        prefs(c).edit().putLong("last_fired", t).apply();
+    }
+
+    static long lastFired(Context c) {
+        return prefs(c).getLong("last_fired", 0);
+    }
+
     static void saveWindowsJson(Context c, String json) {
         prefs(c).edit().putString("windows", json).apply();
     }

@@ -13,8 +13,17 @@ public class ReadyReceiver extends BroadcastReceiver {
         String names = intent.getStringExtra(HerbNotifier.EXTRA_NAMES);
         if (names == null || names.isEmpty()) names = "Herb patches";
 
-        HerbNotifier.showReady(context, id, at, names);
-        HerbNotifier.updateRunning(context);
-        HerbWidgetProvider.updateAll(context);
+        HerbStore.setLastFired(context, System.currentTimeMillis());
+        try {
+            HerbNotifier.showReady(context, id, at, names);
+        } catch (Throwable t) {
+            HerbStore.logError(context, "ready notification", t);
+        }
+        try {
+            HerbNotifier.updateRunning(context);
+            HerbWidgetProvider.updateAll(context);
+        } catch (Throwable t) {
+            HerbStore.logError(context, "status icon", t);
+        }
     }
 }

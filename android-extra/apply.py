@@ -62,6 +62,7 @@ manifest = open(manifest_path, encoding="utf-8").read()
 permissions = (
     '<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n'
     '    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>\n'
+    '    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>\n'
     '    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>\n'
     '    '
 )
@@ -86,7 +87,7 @@ if "POST_NOTIFICATIONS" not in manifest:
     manifest = manifest.replace("<application", permissions + "<application", 1)
 if "HerbWidgetProvider" not in manifest:
     manifest = manifest.replace("</application>", receivers + "</application>", 1)
-for needed in ("POST_NOTIFICATIONS", "RECEIVE_BOOT_COMPLETED", "HerbWidgetProvider", "ReadyReceiver", "ReplantReceiver", "BootReceiver"):
+for needed in ("POST_NOTIFICATIONS", "USE_EXACT_ALARM", "RECEIVE_BOOT_COMPLETED", "HerbWidgetProvider", "ReadyReceiver", "ReplantReceiver", "BootReceiver"):
     if needed not in manifest:
         fail("could not patch AndroidManifest.xml (" + needed + ")")
 open(manifest_path, "w", encoding="utf-8").write(manifest)

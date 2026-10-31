@@ -2,6 +2,8 @@ package com.example.herbloretracker;
 
 import android.content.Context;
 
+import androidx.core.app.NotificationManagerCompat;
+
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -35,6 +37,18 @@ public class HerbWidgetPlugin extends Plugin {
         JSObject result = new JSObject();
         result.put("dirty", HerbStore.isDirty(context));
         result.put("timers", HerbStore.timersJson(context));
+        call.resolve(result);
+    }
+
+    @PluginMethod
+    public void getStatus(PluginCall call) {
+        Context context = getContext();
+        JSObject result = new JSObject();
+        result.put("notificationsEnabled", NotificationManagerCompat.from(context).areNotificationsEnabled());
+        result.put("exactAlarms", HerbNotifier.canExact(context));
+        result.put("alarms", HerbStore.alarmCount(context));
+        result.put("lastFired", HerbStore.lastFired(context));
+        result.put("lastError", HerbStore.lastError(context));
         call.resolve(result);
     }
 
