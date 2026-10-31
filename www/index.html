@@ -37,8 +37,9 @@
             );
         }
         @supports (height: 100dvh) { :root { --vh: 100dvh; } }
-        @media (orientation: landscape) {
-            :root { --cols: 3; --panel-u: 316; --h-u: 345; --h-px: 52px; }
+        /* Landscape or tablet: 3 x 3 patches with Reset / Next Tick / Plant All in a 4th column */
+        @media (orientation: landscape), (min-width: 600px) {
+            :root { --cols: 4; --panel-u: 405; --h-u: 250; --h-px: 76px; }
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -135,14 +136,10 @@
 
         /* Order of the last three cells.
            Portrait:  ... Guild | Next Tick  then  Reset | Plant All
-           Landscape: ... then  Reset | Next Tick | Plant All (Next Tick = bottom middle) */
+           Landscape / tablet: patches fill 3 columns, controls sit in a 4th column (see the media query above) */
         #tick-card { order: 10; }
         #reset-btn { order: 11; }
         #plant-all-btn { order: 12; }
-        @media (orientation: landscape) {
-            #reset-btn { order: 10; }
-            #tick-card { order: 11; }
-        }
 
         /* ---------- Cards ---------- */
         .osrs-card {
@@ -362,21 +359,19 @@
             font-size: 12px;
             color: var(--osrs-red-text);
         }
-        .status-box {
-            margin-top: 6px;
-            font-family: 'Roboto Mono', monospace;
-            font-size: 10.5px;
-            line-height: 1.5;
-            color: #6f6450;
-            text-align: left;
-            white-space: pre-wrap;
-            word-break: break-word;
-            user-select: text;
-            -webkit-user-select: text;
-        }
         .modal-actions { display: flex; gap: 10px; margin-top: 10px; }
         .modal-btn { flex: 1; padding: 10px 0; font-size: 14px; letter-spacing: 0; }
         .modal-save { color: var(--osrs-gold-text); }
+
+        /* ---------- Landscape / tablet layout (kept last so it overrides the base styles) ---------- */
+        @media (orientation: landscape), (min-width: 600px) {
+            .app-viewport-container { max-width: none; }
+            #reset-btn { grid-column: 4; grid-row: 1; }
+            #tick-card { grid-column: 4; grid-row: 2; }
+            #plant-all-btn { grid-column: 4; grid-row: 3; }
+            .ctrl-btn { font-size: calc(var(--u) * 10); }
+            .ctrl-btn .uim-icon { width: calc(var(--u) * 14); height: calc(var(--u) * 14); }
+        }
     </style>
 </head>
 <body>
@@ -392,7 +387,7 @@
         <!-- HEADER -->
         <div class="app-header">
             <button class="header-badge gear-btn" onclick="openAbout()" aria-label="About">
-                <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAAKfklEQVR42u2de8wcVRnGfzM7S1EpRKFgKkWhoKJBYhOLgJcoaJpIq4aoVVPR4F3UiJWiRhQxqDEkRAgQRbnEGk2kajGIClprkXih0oIaIqCJUC+08oGW2u7OjH+87+uenm9mZ+bb2Xa6Oyf5svvtZXbmec55z/NezpngK+cfTNv2XwtbCFoCmtyCGjCyYwQtAdWBS4FkBJw6+pjosVoCKoIfAEcrgEFF4AMg1uM8DzjKOXZLQEmzcwNwL7BUgQxLAB86wK8Afg78Hvimvt9pCSgGPwauA1YBhwFXOuAWAZ8o8JuA7wMv09dfCbwU6LsktATkg/92BasHvAi4RP+PCoC/U4E/XV+Lnc9f1I6AYvCvV/B7CnakQJ4HHKHPu46NT4DlDvAv1tdjPaaZnRh4BbBGn3dbArLBP0d7etebNOcDVyjgPbXxy4FfAus94GfZev2NFFgNHK6/EXSWnxo1FZQoT7qNGfyeA76vik4CtgPHAF8DLgAWOZPusHkiUPKeDPwb+AUQBQ0MRQQZwBfq6TGC77bY69mxd35FzeTsjBK3q2kmqKMAfxR4D7DQsbVuL+tU1OVZ4ONMuGXAx7Hl/SGmpijykABPBa4CkiaNAOuRhwJ3ACfqcN8JrFVZ91Ngt/OdyPFW04pEd4GrnQm3uw+v1bzrZVHDTE+svf5EBeUI/fuEfmab9tiNakN3ZZARF/xOV4+9SsHfDczbx9ea6OPyJqqgrp6g27v7+nwh8EngR8D9wOfUwXmKYxaCEhcfqIJJPF2/L1sI7GwSARYx/KAzOZpZipzJ2SfjduA+4FLg5fpelEOEjbL5wJl67P2JQdi0EZAW9ODA6bFGBsAzgI8DG9Su93OAtQnzDTpqeiNO5rX0uqbY/wRYAJxW4twCz1dIFcwEeIfGXOKcY4RIZLLTlGHfJALmA8+peG5GRleJmAd8HTgoo3f39XfeWVG/TzwB1haM6Gx1dCQcD6z0HCd7PF1HQLy/zU+T5gAD573OBDyqM7dGR0HqjJIAeLWGA5IGEPBE00bAEzWN6gTJQlnwrOOop7c0wPzYb69sAgGBgrMAOKsmcGwUrQKO0+MHanoOZvxBvrKhkOObQkCqE/Ax3gmOcswAeBJwuT4GwKuQHG/ckPkvacJJWK71ceBBz1UfdRT01eM9W4/5tpoInqhJ2CKc24FbayTAlbergecCS5qm/pqWjak7KGZzycnAb4BDGjYCGtMTTHZeMyaFkir4acM6XOMcsX+OSZ+7hVYtAVlqQM3hNqSywMIG45B+LQFDWl8n46lpTSLAlM9Vjvc66S1tYkasx/TUKwVNulBzyLYBdzkafiJ7vj7uk2BcoOYkyvlzy0y6wKPAQzU7ZE1rVjN66bgJsNCw1dJk/VnNT8Kg5GRtk5VLTZ5/D7hmHJ5w6JgPC3q9ADgXeLqnx3ciOdzdDAJofeC/DVVpdREQAA8DcVRzb3e92gBJfq9GFjjktXMONO1eg9cfAN8DZqKagHfr4BcjpSWnIXX1ZvPSnFBAmAP4pJofK5m5CeYejPPNDEidzVlItdlhHtttGfzeSu9BYCsQRCOaGYDXITU5SzOGWafFfJb6CZHKvp3AQVHFXm/APwt4P5LgPtkjJWyBL5zT/miERBXZW4bUYp4LPM0DvgW9nAWJgW9XIcC+9Cngs87r/ba3V2q2wO8WZIFGF+iVmRxNudwFfBn4m/4fUe+KlUlvhvUPgD2GWxkCLBxwC/BhZJ3UxcAOR1IlLb6lCOgDN7u4hhUP0FXgP4PUcF6CLDhrZWax+QFJNm13rEcl4Gx5ZoiU/O1AFh4fqqPDl6dtm43fI4rh/9tc/IBYbRjAsUitzfwJ9l7rUj8B8FXPrJciIHCAd/2ADyArGefnhBXatrfzda96wKErXKICm28Th9mwFcD5wEsc+dln/y/1aToBAbJ6Z0Yx7w8jIHC+mCC1lOcBpyI7f7jhhpDmFXc1Uf0EyNY3+LI9ygDfPvBCZJHDu5CFxa7tah2wcs066W+RVZ0dX7JHHlMp8Ezgu0oAbbhhpGad+R+O+UnJmTQtU+PmZC2V2GnBn1OzLN+3yN4DYxYBKVImvgJ4M5IqjFp9P+feH6q/tCnL/mfJRhsFobL2GqSq2GRoG/eprn42A39hsHRqKAFGgtVqbgBOAb7jmKCWhGrt2mEOalgQvzAP7k3IKhOrXmhNUvlR8NdhnbbIeXLNzjqdG2YY1LW0RAyXn38AtjgmvDIBrknqAD9BlvqsRyKjHef9ts1WQLdSsPQ2rMhqpJr2bCQn8DNn0jbPuZ0jBnitoyBAWTV+Y+tt+0hO4AzgtUpE6Ljd/SkmwrZHuEcV0NA5cy4BtNTzotcjifoVSsTjDDJl00pEiiRedhd9cJQIpoFrSulmJeL5wBeBx8jfOGnSwQ9UfhZiHNY05FLHT3gIuBDJHX9JVdM0yc5QpecdZSR7nTF8N2A3T0/iAlVND0/JBG3hhxkk/RgUXXOdBNgijFht30INZVwHHMkgMDXJzXZlOYm996/LbXVVR7vbRS5E9v15N4ObFkxjeyPw43GOAH/r9jORsovNSBXdUczevn0amo2ClcCzKdiZZZR7oxjwZwC3qZe8gsF2YGYPpyWPEDvzXITsyvgFxyuuzQTZzrOrgdcz2OUwcUIW05i8ca95K/B3FR8MM0NVCYgU/DUOuwnFW7dPuvKJkfzJFdrb7/acsKQOAsy2rVbwLSwxzalKq3i+HPhYjjhJ6lBBZvOPRoJwMW0tkI36R5Ea2a5nikuJj7DkZ2LkhgMbkE3v2nVfAxK6SKVgzzFHpR3OIhDNeToW2SR7MeXupzUNzbA5BLmvwRK8W1TVQYCZnhuBE5TltjxlbxJS5KY8dwKXUXFHxrBgfugDn0bKEt07C7VtNgldpG72eircfzIqAP8iJPGStD0/d6G5vddHFl9vJacEpSwB5mh9RBVPb0p7fuLJyC7Dg4kzwFur/kiUYfN7OtleyOzbNk1D7048iW3X/whyz5rE690xEn6/iUG1+J65EGBy8zgktXgko91Lt+mAJ85zN3Nn13s/klz6hr62DvhXTmjBjfvvmcsIsGT6CUhgbdGE9f4swN1rewxJIIVIjnsj8MOKxy9t930CAmfYXIZsoH2g230/++YHCG2f6k3I/X63AH/KUTju/hhpwW8yFwJCBf/zyEbXvtyMC+RXmTDGuFtc8Ju7VJ1s1R7+AIP9Gvzr8QHvj/PELYV4sU66ezKGUqeG3jhs0gucIRxWBDwgOyB4H1JAthb4MxIavifHBwq9iXWfJpAi4EOq90HW//ptM1LjEiJ7eu7IUAsJsjf/KQwq6MxDXFKRLHdk+drbYlA+4Lfp59ZrL98M/Kck4Pu1rDJCcrcPIMsoI2QviGudz/y6pKnZmGOmlmaoqfcpOebgpci2N4uc7w1rt6vuvlIn0N8VmL60KYBnEbBMe8vMGOx4DPwq4/Ws1w5XAmxtQoLkVRc7isxs+JaC8ztgctERg/Vgkddj6riYvLB1Vg/f4Zg3a3cPiWG5C54P2MR/5FzIOGb7tAI4gXMuwRCikgxvlAOZgKZcSMoULvhoEystAdPd/gfmD95CdnS3jwAAAABJRU5ErkJggg==" alt="About">
+                <svg viewBox="0 0 24 24"><path d="M8.2 8.6a3.9 3.9 0 1 1 6.3 3.1c-1.4 1.1-2.5 1.8-2.5 3.6" fill="none" stroke="#9a7208" stroke-width="2.6" stroke-linecap="round"/><circle cx="12" cy="19.6" r="1.7" fill="#9a7208"/></svg>
             </button>
             <h1 class="osrs-font-title">Herb Patch Timers</h1>
             <button class="header-badge gear-btn" onclick="openTickSettings(false)" aria-label="Farming tick settings">
@@ -448,7 +443,6 @@
                 <label>Tick 3<input id="tick-in-2" type="number" inputmode="numeric" min="0" max="59" onchange="onTickInputChange(2)"></label>
             </div>
             <div class="modal-error" id="tick-error"></div>
-            <div class="status-box" id="native-status"></div>
             <div class="modal-actions">
                 <button class="osrs-btn modal-btn" id="tick-cancel" onclick="closeTickSettings()">Cancel</button>
                 <button class="osrs-btn modal-btn modal-save" onclick="saveTickSettings()">Save</button>
@@ -458,7 +452,6 @@
 
     <!-- ABOUT -->
     <div class="modal-overlay" id="about-modal" hidden onclick="if (event.target === this) closeAbout()">
-        <div class="modal-card osrs-panel">
         <div class="modal-card osrs-panel">
 <p class="modal-text about-text">Heyo! I use a similar timer on PC on a side display for tracking different herb patches. Using AI I've transfered that into an app with some other features for a QOL mobile timer. If you've set your farming tick up wrong you can fix that in the settings. Make sure you give notification/timer permissions for this to work. You can reset all timers from the notification so you don't have to tab out of Scape. Do what you want with this app. Just don't sell it. Selling AI stuff is fucking stupid. Cheers, Rikku.</p>
             <div class="modal-actions">
@@ -519,6 +512,10 @@
             const cap = window.Capacitor;
             if (!cap) return undefined;                       // normal browser
             if (cap.Plugins && cap.Plugins[name]) return cap.Plugins[name];
+            if (typeof cap.nativePromise === 'function') {
+                // Not listed under Capacitor.Plugins: call the Android side directly
+                return new Proxy({}, { get: (_, method) => (options) => cap.nativePromise(name, String(method), options || {}) });
+            }
             try { return cap.registerPlugin ? cap.registerPlugin(name) : undefined; } catch (e) { return undefined; }
         }
         const LN = getPlugin('LocalNotifications');
@@ -679,28 +676,6 @@
             } catch (e) { console.error('Could not read native state', e); }
         }
 
-        // Fills the small status box on the settings screen so problems are easy to spot.
-        async function refreshNativeStatus() {
-            const box = document.getElementById('native-status');
-            if (!box) return;
-            if (!window.Capacitor) { box.innerText = 'Running in a browser: phone notifications are not available here.'; return; }
-            if (!HW) { box.innerText = 'Android link: not found (using backup notifications)'; return; }
-            try {
-                const st = await HW.getStatus();
-                const lines = [
-                    'Android link: OK' + (nativeWorking ? '' : ' (not accepting timers, using backup)'),
-                    'Notifications: ' + (st.notificationsEnabled ? 'ON' : 'OFF - allow them in phone Settings > Apps > Herb Timer > Notifications'),
-                    'Exact alarms: ' + (st.exactAlarms ? 'ON' : 'OFF - allow "Alarms & reminders" for this app'),
-                    'Alerts scheduled: ' + st.alarms
-                ];
-                if (st.lastFired) lines.push('Last alert fired: ' + new Date(st.lastFired).toLocaleTimeString());
-                if (st.lastError) lines.push('Last error: ' + st.lastError);
-                box.innerText = lines.join('\n');
-            } catch (e) {
-                box.innerText = 'Android link: found but not responding (' + e + ')';
-            }
-        }
-
         // ---------- Farming tick settings ----------
         function pad2(n) { return String(n).padStart(2, '0'); }
 
@@ -732,7 +707,6 @@
             document.getElementById('tick-error').innerText = '';
             document.getElementById('tick-cancel').style.display = firstRun ? 'none' : '';
             document.getElementById('tick-modal').hidden = false;
-            refreshNativeStatus();
         }
 
         function openAbout() { document.getElementById('about-modal').hidden = false; }
