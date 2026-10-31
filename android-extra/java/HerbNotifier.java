@@ -31,7 +31,8 @@ import java.util.TreeMap;
  */
 final class HerbNotifier {
     static final String CH_READY = "herb-timers";
-    static final String CH_RUNNING = "herb-running";
+    static final String CH_RUNNING = "herb-status";
+    private static final String CH_RUNNING_OLD = "herb-running";
     static final int RUNNING_ID = 1000;
     static final int MAX_GROUPS = 12;
     static final long GROW_MS = 60L * 60L * 1000L;
@@ -54,9 +55,14 @@ final class HerbNotifier {
         ready.enableVibration(true);
         nm.createNotificationChannel(ready);
 
-        NotificationChannel running = new NotificationChannel(CH_RUNNING, "Timers running", NotificationManager.IMPORTANCE_LOW);
-        running.setDescription("Shows an icon while herb timers are growing");
-        nm.createNotificationChannel(running);
+        // Always-on status icon: normal importance so the icon always shows in the status bar, but silent
+        nm.deleteNotificationChannel(CH_RUNNING_OLD);
+        NotificationChannel status = new NotificationChannel(CH_RUNNING, "Timer status icon", NotificationManager.IMPORTANCE_DEFAULT);
+        status.setDescription("Shows an icon in the status bar while herb timers are growing or ready");
+        status.setSound(null, null);
+        status.enableVibration(false);
+        status.setShowBadge(false);
+        nm.createNotificationChannel(status);
     }
 
     /** Next farming tick strictly after `fromMs` (same rule as the web app). */
@@ -122,6 +128,15 @@ final class HerbNotifier {
 
     /** Rebuilds every "ready" alarm from the saved timers, then refreshes the running icon. */
     static void scheduleAll(Context ctx) {
+        try {
+            scheduleAlarms(ctx);
+        } catch (Exception ignored) { }
+        try {
+            updateRunning(ctx);
+        } catch (Exception ignored) { }
+    }
+
+    private static void scheduleAlarms(Context ctx) {
         ensureChannels(ctx);
         AlarmManager alarms = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
         if (alarms == null) return;
@@ -173,8 +188,6 @@ final class HerbNotifier {
             setAlarm(alarms, entry.getKey(), pending);
             id++;
         }
-
-        updateRunning(ctx);
     }
 
     // ---------- notifications ----------
@@ -203,32 +216,53 @@ final class HerbNotifier {
         notifySafely(ctx, id, builder.build());
     }
 
-    /** Status-bar icon while at least one timer is growing. */
+    /**
+     * Status-bar icon. Shown while any timer is growing AND while finished patches are waiting
+     * to be harvested. Removed only when no patch is planted.
+     */
     static void updateRunning(Context ctx) {
         ensureChannels(ctx);
         long now = System.currentTimeMillis();
         int running = 0;
+        int ready = 0;
         long next = 0;
         JSONArray timers = HerbStore.timers(ctx);
         try {
             for (int i = 0; i < timers.length(); i++) {
                 long finish = timers.getJSONObject(i).optLong("finish", 0);
+                if (finish <= 0) continue;
                 if (finish > now) {
                     running++;
                     if (next == 0 || finish < next) next = finish;
+                } else {
+                    ready++;
                 }
             }
         } catch (Exception ignored) { }
 
-        if (running == 0) {
+        if (running == 0 && ready == 0) {
             NotificationManagerCompat.from(ctx).cancel(RUNNING_ID);
             return;
         }
+
+        String title;
+        String text;
+        if (running > 0) {
+            title = "Herb timers running";
+            text = running + " growing \u00B7 next ready " + clock(next);
+            if (ready > 0) text += " \u00B7 " + ready + " ready";
+        } else {
+            title = "Herbs ready to harvest!";
+            text = ready + (ready == 1 ? " patch is ready" : " patches are ready");
+        }
+
         NotificationCompat.Builder builder = new NotificationCompat.Builder(ctx, CH_RUNNING)
                 .setSmallIcon(R.drawable.ic_stat_herb)
-                .setContentTitle("Herb timers running")
-                .setContentText(running + " growing \u00B7 next ready " + clock(next))
-                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setSound(null)
+                .setVibrate(null)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setAutoCancel(false)

@@ -23,7 +23,9 @@ public class HerbWidgetPlugin extends Plugin {
         HerbStore.saveTimersJson(context, call.getString("timers", "[]"));
         HerbStore.saveWindowsJson(context, call.getString("windows", "[9,29,49]"));
         HerbNotifier.scheduleAll(context);
-        HerbWidgetProvider.updateAll(context);
+        try {
+            HerbWidgetProvider.updateAll(context);
+        } catch (Exception ignored) { }
         call.resolve();
     }
 
