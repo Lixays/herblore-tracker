@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="herb_widget_description">Shows the next herb timer to finish, with a Replant all button</string>
+    <string name="herb_mini_widget_description">Small widget: how long until all your herb timers are done</string>
+</resources>
