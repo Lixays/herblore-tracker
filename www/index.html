@@ -359,6 +359,12 @@
             font-size: 12px;
             color: var(--osrs-red-text);
         }
+        .about-version {
+            font-family: 'Roboto Mono', monospace;
+            font-size: 11px;
+            color: #6f6450;
+            margin-top: 6px;
+        }
         .modal-actions { display: flex; gap: 10px; margin-top: 10px; }
         .modal-btn { flex: 1; padding: 10px 0; font-size: 14px; letter-spacing: 0; }
         .modal-save { color: var(--osrs-gold-text); }
@@ -453,7 +459,8 @@
     <!-- ABOUT -->
     <div class="modal-overlay" id="about-modal" hidden onclick="if (event.target === this) closeAbout()">
         <div class="modal-card osrs-panel">
-<p class="modal-text about-text">Heyo! I use a similar timer on PC on a side display for tracking different herb patches. Using AI I've transfered that into an app with some other features for a QOL mobile timer. If you've set your farming tick up wrong you can fix that in the settings. Make sure you give notification/timer permissions for this to work. You can reset all timers from the notification so you don't have to tab out of Scape. Do what you want with this app. Just don't sell it. Selling AI stuff is fucking stupid. Cheers, Rikku.</p>
+            <p class="modal-text about-text">Heyo! This little app was designed by Rikku. It's just a little project for personal use, feel free to mess with it, change it how you like. Just don't tell it. Never sell things made with AI.</p>
+            <div class="about-version" id="about-version"></div>
             <div class="modal-actions">
                 <button class="osrs-btn modal-btn modal-save" onclick="closeAbout()">Close</button>
             </div>
@@ -463,6 +470,7 @@
     <!-- SCRIPT -->
     <script>
         // Minutes past the hour when herb patches tick (20 minutes apart). Editable via the gear button.
+        const APP_VERSION = '1.7';   // also used for the Android app version when the APK is built
         const DEFAULT_WINDOWS = [9, 29, 49];
         function loadWindows() {
             try {
@@ -736,7 +744,10 @@
             document.getElementById('tick-modal').hidden = false;
         }
 
-        function openAbout() { document.getElementById('about-modal').hidden = false; }
+        function openAbout() {
+            document.getElementById('about-version').innerText = 'Version ' + APP_VERSION;
+            document.getElementById('about-modal').hidden = false;
+        }
         function closeAbout() { document.getElementById('about-modal').hidden = true; }
 
         function closeTickSettings() {

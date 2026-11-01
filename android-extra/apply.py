@@ -7,8 +7,10 @@ def fail(msg):
     print("ERROR:", msg)
     sys.exit(1)
 
-cfg = json.load(open("capacitor.config.json", encoding="utf-8"))
-pkg = cfg["appId"]
+try:
+    pkg = json.load(open("capacitor.config.json", encoding="utf-8"))["appId"]
+except Exception:
+    pkg = "com.example.herbloretracker"
 main = "android/app/src/main"
 res = main + "/res"
 manifest_path = main + "/AndroidManifest.xml"
@@ -64,13 +66,6 @@ for src in glob.glob("android-extra/java/*.java"):
 
 # 4. manifest: permissions + receivers (widget, notifications, boot)
 manifest = open(manifest_path, encoding="utf-8").read()
-permissions = (
-    '<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n'
-    '    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>\n'
-    '    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>\n'
-    '    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>\n'
-    '    '
-)
 receivers = (
     '    <receiver android:name=".HerbWidgetProvider" android:exported="true" android:label="Herb Timer - next ready">\n'
     '            <intent-filter>\n'
@@ -95,8 +90,11 @@ receivers = (
     '        </receiver>\n'
     '    '
 )
-if "POST_NOTIFICATIONS" not in manifest:
-    manifest = manifest.replace("<application", permissions + "<application", 1)
+for permission in ("POST_NOTIFICATIONS", "SCHEDULE_EXACT_ALARM", "USE_EXACT_ALARM", "RECEIVE_BOOT_COMPLETED"):
+    if "android.permission." + permission not in manifest:
+        manifest = manifest.replace(
+            "<application",
+            '<uses-permission android:name="android.permission.%s"/>\n    <application' % permission, 1)
 if "HerbWidgetProvider" not in manifest:
     manifest = manifest.replace("</application>", receivers + "</application>", 1)
 for needed in ("POST_NOTIFICATIONS", "USE_EXACT_ALARM", "RECEIVE_BOOT_COMPLETED", "HerbWidgetProvider", "ReadyReceiver", "ReplantReceiver", "SnoozeReceiver", "HerbMiniWidgetProvider", "BootReceiver"):
@@ -104,12 +102,39 @@ for needed in ("POST_NOTIFICATIONS", "USE_EXACT_ALARM", "RECEIVE_BOOT_COMPLETED"
         fail("could not patch AndroidManifest.xml (" + needed + ")")
 open(manifest_path, "w", encoding="utf-8").write(manifest)
 
+# 5. app version (single source: APP_VERSION in www/index.html)
+import re
+version = "1.0"
+try:
+    html_text = open("www/index.html", encoding="utf-8").read()
+    version = re.search(r"APP_VERSION\s*=\s*'([^']+)'", html_text).group(1)
+except Exception:
+    print("WARNING: APP_VERSION not found in www/index.html, using", version)
+parts = (version.split(".") + ["0", "0"])[:3]
+try:
+    code = int(parts[0]) * 10000 + int(parts[1]) * 100 + int(parts[2])
+except ValueError:
+    code = 1
+patched = False
+for name in ("build.gradle", "build.gradle.kts"):
+    path = os.path.join("android", "app", name)
+    if os.path.isfile(path):
+        gradle = open(path, encoding="utf-8").read()
+        gradle = re.sub(r"(versionCode\s*=?\s*)\d+", r"\g<1>%d" % code, gradle, count=1)
+        gradle = re.sub(r'(versionName\s*=?\s*)"[^"]*"', r'\g<1>"%s"' % version, gradle, count=1)
+        open(path, "w", encoding="utf-8").write(gradle)
+        patched = True
+print("App version set to %s (build number %d)%s" % (version, code, "" if patched else " - WARNING: build.gradle not found"))
+
 print("Icons, widget, notifications and permissions applied for", pkg)
 
-# 5. make the app work offline: bundle the wiki images and fonts into the app
+# 6. make the app work offline: bundle the wiki images and fonts into the app
 try:
     sys.path.insert(0, "android-extra")
     import offline_assets
     offline_assets.main()
 except Exception as error:   # never stop the build because of this
     print("WARNING: offline assets step failed:", error)
+
+# Remember that everything above worked (capacitor.config.js uses this to avoid doing it twice)
+open(os.path.join("android", ".herb-applied"), "w").write("ok\n")
